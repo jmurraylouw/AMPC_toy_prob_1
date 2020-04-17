@@ -1,0 +1,41 @@
+% Basesed on algorithm explained by cs.tut.fi/~tabus/course/ASP/LectureNew10.pdf
+% Code written by: JM Louw
+disp("START")
+disp("-----")
+u       = out.f.data;
+d       = out.x.data;
+N       = max(size(d)); % Number of time steps
+alpha   = zeros(1,N); % Error between predicted and actual output
+y       = zeros(1,N); % Predicted output
+
+M = 100; % Number of parameters in w
+%w0 = zeros(M,1); % w at time = 0. Initial guess
+w       = zeros(N,M); % Inititialise parameter vectors, Time steps downwards
+P       = 100*eye(M); % Initialise large P
+lambda  = 0.99; %forgetting factor
+
+% No need to remeber previous k or P,
+% only update k and P for next use.
+
+for n = M:1:N
+    pi      = u(n-M+1:n)'*P; % Use M previous values of U as well
+    gamma   = lambda + pi*u(n-M+1:n);
+    k       = pi'/gamma;
+    y(n)    = w(n-1,:)*u(n-M+1:n);
+    alpha(n) = d(n) - y(n);
+    w(n,:)  = w(n-1,:) + k'*alpha(n); % Extimate next w vector
+
+    P_prime = k*pi;
+    P       = 1/lambda*(P - P_prime); % Update P for next use
+end
+
+figure;
+plot(y); hold on
+plot(d)
+plot(alpha, 'k')
+title("M = " + M)
+
+legend('y', 'd', 'alpha')
+
+disp("END")
+disp("---")
