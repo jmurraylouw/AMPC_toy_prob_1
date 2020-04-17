@@ -227,11 +227,12 @@ function Outputs(block)
     
     
     % If enable = 0, then output original model
-    enable = block.InputPort(4).Data;
-    if enable == 0
+    option = block.InputPort(4).Data;
+    
+    if option == 0
         % Model from mpc object
-        A = [0.9271 -0.4837; 0.09673 0.9755];
-        B = [0.09673; 0.004897];
+        A = [0.969169519504925  -0.246386829627017;  0.049277365925403  0.993808202467626];
+        B = [0.049277365925403; 0.001238359506475];
         block.OutputPort(3).Data = A2-A ;
     end
     
@@ -273,9 +274,9 @@ function Derivatives(block)
 
 function SetInputPortSamplingMode(block, port, mode)
     block.InputPort(port).SamplingMode = mode;
-    block.OutputPort(1).SamplingMode = mode;
-    block.OutputPort(2).SamplingMode = mode;
-    block.OutputPort(3).SamplingMode = mode;
+%     block.OutputPort(1).SamplingMode = mode;
+%     block.OutputPort(2).SamplingMode = mode;
+%     block.OutputPort(3).SamplingMode = mode;
     
 %end SetInputPortSamplingMode
 
