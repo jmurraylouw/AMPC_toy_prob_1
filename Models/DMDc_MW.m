@@ -8,7 +8,7 @@ f_data      = out.f.Data';
 x_data      = out.x.Data';
 x_dot_data  = out.x_dot.Data';
 t       = out.tout';
-
+%%
 n       = max(size(x_data));
 Ts      = 0.05; % Sample time of data
 w       = 100;    % Size of window in timesteps
@@ -23,6 +23,7 @@ U_dwork = zeros(1,w);
 % plot(t, x_data, 'k'); hold on; % Plot measured x vs t
 
 a11=zeros(1,n-1);
+MSE = zeros(1,n-1);
 
 incr = 1;%/Ts; % Increment size for data plots
 for k = 1:incr:n-1
@@ -43,6 +44,17 @@ for k = 1:incr:n-1
     AB = X2*pinv(XU);
     A  = AB(:,1:2);
     B  = AB(:,end);
+    
+    % Check for change in model
+    w_c = 20; % window of data points to check for change in system model
+    
+    % Take only last w_c entries of X and X2
+    X2_measured = X2(:, (end-w_c+1):end);
+    X_measured  = X(:, (end-w_c+1):end);
+    
+    % Calculate X2 according to A
+    X2_calc = A*X_measured;
+    MSE(k) = mean((X2_measured - X2_calc).^2, 'all');
     
     a11(k) = A(1,1);
 %     plot_model(A,B,U_data,t);
@@ -65,7 +77,9 @@ C = [0 1];
 D = 0;
 
 t = 1:1:n-1;
-plot(t,a11)
+plot(t,a11);
+hold on;
+plot(t,MSE)
 
 % plot_model(A,B,f_data,t,2)
 % hold on;

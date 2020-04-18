@@ -26,7 +26,7 @@ function setup(block)
 
 % Register number of ports
 block.NumInputPorts  = 4;
-block.NumOutputPorts = 3;
+block.NumOutputPorts = 4;
 
 % Setup port properties to be inherited or dynamic
 block.SetPreCompInpPortInfoToDynamic;
@@ -77,10 +77,18 @@ block.OutputPort(3).DatatypeID       = 0; % double
 block.OutputPort(3).Complexity       = 'Real';
 block.OutputPort(3).SamplingMode     = 'Sample';
 
+% Mean Squared Error
+block.OutputPort(4).Dimensions       = 1;
+block.OutputPort(4).DatatypeID       = 0; % double
+block.OutputPort(4).Complexity       = 'Real';
+block.OutputPort(4).SamplingMode     = 'Sample';
+
+
 % Register parameters
 % parameter 1 = T_window (time width of data memory window)
 % parameter 2 = Ts (sample time)
-block.NumDialogPrms     = 2;
+% parameter 3 = w_c (window of timesteps to check for change in model)
+block.NumDialogPrms     = 3;
 
 % Register sample times
 %  [0 offset]            : Continuous sample time
@@ -131,7 +139,7 @@ function DoPostPropSetup(block)
     nx = 2; % Size of state vector 
     nu = 1; % Size of input vector
     
-    block.NumDworks = 2;
+    block.NumDworks = 4;
   
     % Matrix of window of state vectors
     % Needs to reshape because Dwork cannot store matrix
@@ -149,7 +157,19 @@ function DoPostPropSetup(block)
     block.Dwork(2).Complexity      = 'Real'; % real
     block.Dwork(2).UsedAsDiscState = true;
     
+    block.Dwork(3).Name            = 'A_prev';
+    block.Dwork(3).Dimensions      = nx*nx;
+    block.Dwork(3).DatatypeID      = 0;      % double
+    block.Dwork(3).Complexity      = 'Real'; % real
+    block.Dwork(3).UsedAsDiscState = true;
 
+    block.Dwork(4).Name            = 'B_prev';
+    block.Dwork(4).Dimensions      = nx*nu;
+    block.Dwork(4).DatatypeID      = 0;      % double
+    block.Dwork(4).Complexity      = 'Real'; % real
+    block.Dwork(4).UsedAsDiscState = true;
+    
+    
 %%
 %% InitializeConditions:
 %%   Functionality    : Called at the start of simulation and if it is 
@@ -201,6 +221,7 @@ function Start(block)
 function Outputs(block)
     
     w = block.DialogPrm(1).Data; % Window width
+    w_c = block.DialogPrm(3).Data % Window to check model change
     nx = 2; % Size of state vector 
     nu = 1; % Size of input vector
 
@@ -210,27 +231,42 @@ function Outputs(block)
     
     X_dwork = block.Dwork(1).Data;
     U_dwork = block.Dwork(2).Data;
+    A_dwork = block.Dwork(3).Data;
+    B_dwork = block.Dwork(4).Data;
 
     X = reshape(X_dwork, nx, w); % Reshape vector into matrix
     U = reshape(U_dwork, nu, w); % Reshape vector into matrix
+    A = reshape(A_dwork, nx, nx);
+    B = reshape(B_dwork, nx, nu);
     
     % Add input data to X2
     X2 = [X(:, 2:end), [x_dot; x]];
-   
-    % Calculate A and B
-    % Based on DMD control example video by Steve Brunton
-    XU = [X; U];
-    AB = X2*pinv(XU);
-    A  = AB(:,1:2);
-    B  = AB(:,end);
-    A2=A;
     
+    % Check for change in model
+    % Take only last w_c entries of X and X2
+    X2_measured = X2(:, (end-w_c+1):end);
+    X_measured  = X(:, (end-w_c+1):end);
+        
+    X2_calc = A*X_measured; % Calculate X2 according to A
+    MSE = mean((X2_measured - X2_calc).^2, 'all'); % Mean Squared Error
+    
+    MSE_max = 1;
+    
+    if MSE > MSE_max
+        % Calculate A and B
+        % Based on DMD control example video by Steve Brunton
+        XU = [X; U];
+        AB = X2*pinv(XU);
+        A  = AB(:,1:2);
+        B  = AB(:,end);
+    end
     
     % If enable = 0, then output original model
     option = block.InputPort(4).Data;
     
     if option == 0
         % Model from mpc object
+        A2=A;
         A = [0.969169519504925  -0.246386829627017;  0.049277365925403  0.993808202467626];
         B = [0.049277365925403; 0.001238359506475];
         block.OutputPort(3).Data = A2-A ;
@@ -240,13 +276,21 @@ function Outputs(block)
     % Output
     block.OutputPort(1).Data = A;
     block.OutputPort(2).Data = B;
+    block.OutputPort(4).Data = MSE;
     
     % Update Dwork memory 
     X_dwork = reshape(X2, 1, w*nx);
     U_dwork = reshape([U(:, 2:end), f], 1, w*nu);
+    A_dwork = reshape(A, 1, nx*nx);
+    B_dwork = reshape(B, 1, nu*nx);
     
     block.Dwork(1).Data = X_dwork;
     block.Dwork(2).Data = U_dwork;
+    block.Dwork(3).Data = A_dwork;
+    block.Dwork(4).Data = B_dwork;
+    
+    
+    
 %end Outputs
 
 %%
