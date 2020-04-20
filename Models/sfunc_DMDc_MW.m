@@ -25,8 +25,8 @@ setup(block);
 function setup(block)
 
 % Register number of ports
-block.NumInputPorts  = 4;
-block.NumOutputPorts = 4;
+block.NumInputPorts  = 3;
+block.NumOutputPorts = 3;
 
 % Setup port properties to be inherited or dynamic
 block.SetPreCompInpPortInfoToDynamic;
@@ -51,13 +51,6 @@ block.InputPort(3).DatatypeID        = 0;  % double
 block.InputPort(3).Complexity        = 'Real';
 block.InputPort(3).DirectFeedthrough = true;
 
-% enable
-block.InputPort(4).Dimensions        = 1;
-block.InputPort(4).DatatypeID        = 0;  % double
-block.InputPort(4).Complexity        = 'Real';
-block.InputPort(4).DirectFeedthrough = true;
-
-
 % Override OUTPUT port properties
 % A (Flattened system matrix)
 block.OutputPort(1).Dimensions       = [2, 2];
@@ -71,24 +64,17 @@ block.OutputPort(2).DatatypeID       = 0; % double
 block.OutputPort(2).Complexity       = 'Real';
 block.OutputPort(2).SamplingMode     = 'Sample';
 
-% A error (debug)
-block.OutputPort(3).Dimensions       = [2, 2];
+% Mean Squared Error
+block.OutputPort(3).Dimensions       = 1;
 block.OutputPort(3).DatatypeID       = 0; % double
 block.OutputPort(3).Complexity       = 'Real';
 block.OutputPort(3).SamplingMode     = 'Sample';
 
-% Mean Squared Error
-block.OutputPort(4).Dimensions       = 1;
-block.OutputPort(4).DatatypeID       = 0; % double
-block.OutputPort(4).Complexity       = 'Real';
-block.OutputPort(4).SamplingMode     = 'Sample';
-
 
 % Register parameters
-% parameter 1 = T_window (time width of data memory window)
-% parameter 2 = Ts (sample time)
-% parameter 3 = w_c (window of timesteps to check for change in model)
-block.NumDialogPrms     = 3;
+% parameter 1 = Ts (sample time)
+% parameter 2 = window (width of data memory window in data steps)
+block.NumDialogPrms     = 2;
 
 % Register sample times
 %  [0 offset]            : Continuous sample time
@@ -96,7 +82,7 @@ block.NumDialogPrms     = 3;
 %
 %  [-1, 0]               : Inherited sample time
 %  [-2, 0]               : Variable sample time
-block.SampleTimes = [block.DialogPrm(2).Data 0]; % Set sample time
+block.SampleTimes = [block.DialogPrm(1).Data 0]; % Set sample time
 
 % Specify the block simStateCompliance. The allowed values are:
 %    'UnknownSimState', < The default setting; warn and assume DefaultSimState
@@ -135,7 +121,7 @@ block.RegBlockMethod('SetInputPortSamplingMode', @SetInputPortSamplingMode);
 %%
 function DoPostPropSetup(block)
     % w = Timestep width of window (T_window/Ts)    
-    w = block.DialogPrm(1).Data;    
+    w = block.DialogPrm(2).Data;    
     nx = 2; % Size of state vector 
     nu = 1; % Size of input vector
     
@@ -194,7 +180,7 @@ function InitializeConditions(block)
 %%
 function Start(block)
     % w = Timestep width of window (T_window/Ts)    
-    w = block.DialogPrm(1).Data;    
+    w = block.DialogPrm(2).Data;    
     nx = 2; % Size of state vector 
     nu = 1; % Size of input vector
     
@@ -220,8 +206,7 @@ function Start(block)
 %%
 function Outputs(block)
     
-    w = block.DialogPrm(1).Data; % Window width
-    w_c = block.DialogPrm(3).Data % Window to check model change
+    w = block.DialogPrm(2).Data; % Window width
     nx = 2; % Size of state vector 
     nu = 1; % Size of input vector
 
@@ -242,25 +227,21 @@ function Outputs(block)
     % Add input data to X2
     X2 = [X(:, 2:end), [x_dot; x]];
     
-    % Check for change in model
-    % Take only last w_c entries of X and X2
-    X2_measured = X2(:, (end-w_c+1):end);
-    X_measured  = X(:, (end-w_c+1):end);
-        
-    X2_calc = A*X_measured; % Calculate X2 according to A
-    MSE = mean((X2_measured - X2_calc).^2, 'all'); % Mean Squared Error
-    
+    % Calculate Mean Squared Error
+    X2_calc = A*X; % Calculate X2 according to A
+    MSE = mean((X2 - X2_calc).^2, 'all'); % Mean Squared Error
+
     % Calculate A and B
     % Based on DMD control example video by Steve Brunton
     XU = [X; U];
     AB = X2*pinv(XU);
-    A  = AB(:,1:2)
+    A  = AB(:,1:2);
     B  = AB(:,end);
        
     % Output
     block.OutputPort(1).Data = A;
     block.OutputPort(2).Data = B;
-    block.OutputPort(4).Data = MSE;
+    block.OutputPort(3).Data = MSE;
     
     % Update Dwork memory 
     X_dwork = reshape(X2, 1, w*nx);
@@ -272,9 +253,7 @@ function Outputs(block)
     block.Dwork(2).Data = U_dwork;
     block.Dwork(3).Data = A_dwork;
     block.Dwork(4).Data = B_dwork;
-    
-    
-    
+   
 %end Outputs
 
 %%
