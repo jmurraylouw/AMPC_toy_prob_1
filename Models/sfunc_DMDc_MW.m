@@ -250,29 +250,13 @@ function Outputs(block)
     X2_calc = A*X_measured; % Calculate X2 according to A
     MSE = mean((X2_measured - X2_calc).^2, 'all'); % Mean Squared Error
     
-    MSE_max = 1;
-    
-    if MSE > MSE_max
-        % Calculate A and B
-        % Based on DMD control example video by Steve Brunton
-        XU = [X; U];
-        AB = X2*pinv(XU);
-        A  = AB(:,1:2);
-        B  = AB(:,end);
-    end
-    
-    % If enable = 0, then output original model
-    option = block.InputPort(4).Data;
-    
-    if option == 0
-        % Model from mpc object
-        A2=A;
-        A = [0.969169519504925  -0.246386829627017;  0.049277365925403  0.993808202467626];
-        B = [0.049277365925403; 0.001238359506475];
-        block.OutputPort(3).Data = A2-A ;
-    end
-    
-    
+    % Calculate A and B
+    % Based on DMD control example video by Steve Brunton
+    XU = [X; U];
+    AB = X2*pinv(XU);
+    A  = AB(:,1:2)
+    B  = AB(:,end);
+       
     % Output
     block.OutputPort(1).Data = A;
     block.OutputPort(2).Data = B;

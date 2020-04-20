@@ -12,7 +12,7 @@ t       = out.tout';
 n       = max(size(x_data));
 Ts      = 0.05; % Sample time of data
 w       = 100;    % Size of window in timesteps
-
+%%
 % Initialise
 A_output = zeros(2,2);
 B_output = zeros(2,1);
