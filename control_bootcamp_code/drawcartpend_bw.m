@@ -45,5 +45,4 @@ set(gcf,'InvertHardcopy','off')
 
 % box off
 drawnow
-pause(t_pause)
 hold off

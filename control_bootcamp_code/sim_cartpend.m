@@ -14,9 +14,11 @@ x0 = [0; 0; 0; 0];
 plot(t,x);
 
 %% Data from simulink
-t = out.tout;
+t = out.x.Time;
 x = out.x.Data;
+plot(t,x);
 
+%%
 
 t_pause = 0;
 for k=1:length(t)
