@@ -1,4 +1,4 @@
-function sfunc_DMDc_MW(block)
+function sfunc_DMDc_MW_msd(block)
 %sfunc_DMDc_MW - Applies Dynamic Mode Decomposition with Control and a
 %Moving Window of past input data to obtain the state space system matrixes
 
@@ -8,7 +8,6 @@ function sfunc_DMDc_MW(block)
 %% calls to the main body of the function.
 %%
 setup(block);
-% Get dimentions of state and input vectors
 
 %endfunction
 
@@ -26,7 +25,7 @@ setup(block);
 function setup(block)
 
 % Register number of ports
-block.NumInputPorts  = 2;
+block.NumInputPorts  = 3;
 block.NumOutputPorts = 3;
 
 % Setup port properties to be inherited or dynamic
@@ -34,24 +33,33 @@ block.SetPreCompInpPortInfoToDynamic;
 block.SetPreCompOutPortInfoToDynamic;
 
 % Override INPUT port properties
-% u (input vector)
-block.InputPort(1).Dimensions = -1
+% f (Force applied to model)
+block.InputPort(1).Dimensions        = 1;
 block.InputPort(1).DatatypeID        = 0;  % double
 block.InputPort(1).Complexity        = 'Real';
+block.InputPort(1).DirectFeedthrough = true;
 
-% x (state vector)
-block.InputPort(2).Dimensions = -1
+% x (Plant output distance)
+block.InputPort(2).Dimensions        = 1;
 block.InputPort(2).DatatypeID        = 0;  % double
 block.InputPort(2).Complexity        = 'Real';
+block.InputPort(2).DirectFeedthrough = true;
 
+% x_dot (Plant output velocity)
+block.InputPort(3).Dimensions        = 1;
+block.InputPort(3).DatatypeID        = 0;  % double
+block.InputPort(3).Complexity        = 'Real';
+block.InputPort(3).DirectFeedthrough = true;
 
 % Override OUTPUT port properties
 % A (Flattened system matrix)
+block.OutputPort(1).Dimensions       = [2, 2];
 block.OutputPort(1).DatatypeID       = 0; % double
 block.OutputPort(1).Complexity       = 'Real';
 block.OutputPort(1).SamplingMode     = 'Sample';
 
 % B (Input matrix)
+block.OutputPort(2).Dimensions       = [2, 1];
 block.OutputPort(2).DatatypeID       = 0; % double
 block.OutputPort(2).Complexity       = 'Real';
 block.OutputPort(2).SamplingMode     = 'Sample';
@@ -101,8 +109,6 @@ block.RegBlockMethod('Update', @Update);
 block.RegBlockMethod('Derivatives', @Derivatives);
 block.RegBlockMethod('Terminate', @Terminate); % Required
 block.RegBlockMethod('SetInputPortSamplingMode', @SetInputPortSamplingMode);
-block.RegBlockMethod('SetInputPortDimensions', @SetInpPortDims);
-block.RegBlockMethod('SetOutputPortDimensions', @SetOutPortDims);
   
 %end setup
 
@@ -115,11 +121,9 @@ block.RegBlockMethod('SetOutputPortDimensions', @SetOutPortDims);
 %%
 function DoPostPropSetup(block)
     % w = Timestep width of window (T_window/Ts)    
-    w = block.DialogPrm(2).Data; 
-    
-    % Get dimentions of state and input vectors
-    nx = block.InputPort(2).Dimensions; % Length of state vector
-    nu = block.InputPort(1).Dimensions; % Length of input vector
+    w = block.DialogPrm(2).Data;    
+    nx = 2; % Size of state vector 
+    nu = 1; % Size of input vector
     
     block.NumDworks = 4;
   
@@ -176,11 +180,9 @@ function InitializeConditions(block)
 %%
 function Start(block)
     % w = Timestep width of window (T_window/Ts)    
-    w = block.DialogPrm(2).Data;   
-    
-    % Get dimentions of state and input vectors
-    nx = block.InputPort(2).Dimensions; % Length of state vector
-    nu = block.InputPort(1).Dimensions; % Length of input vector
+    w = block.DialogPrm(2).Data;    
+    nx = 2; % Size of state vector 
+    nu = 1; % Size of input vector
     
     % Inititialise variables    
     X = zeros(nx,w);
@@ -205,13 +207,12 @@ function Start(block)
 function Outputs(block)
     
     w = block.DialogPrm(2).Data; % Window width
-    
-    % Get dimentions of state and input vectors
-    nx = block.InputPort(2).Dimensions; % Length of state vector
-    nu = block.InputPort(1).Dimensions; % Length of input vector
+    nx = 2; % Size of state vector 
+    nu = 1; % Size of input vector
 
-    u       = block.InputPort(1).Data;
+    f       = block.InputPort(1).Data;
     x       = block.InputPort(2).Data;
+    x_dot   = block.InputPort(3).Data;
     
     X_dwork = block.Dwork(1).Data;
     U_dwork = block.Dwork(2).Data;
@@ -224,7 +225,7 @@ function Outputs(block)
     B = reshape(B_dwork, nx, nu);
     
     % Add input data to X2
-    X2 = [X(:, 2:end), x];
+    X2 = [X(:, 2:end), [x_dot; x]];
     
     % Calculate Mean Squared Error
     X2_calc = A*X; % Calculate X2 according to A
@@ -244,7 +245,7 @@ function Outputs(block)
     
     % Update Dwork memory 
     X_dwork = reshape(X2, 1, w*nx);
-    U_dwork = reshape([U(:, 2:end), u], 1, w*nu);
+    U_dwork = reshape([U(:, 2:end), f], 1, w*nu);
     A_dwork = reshape(A, 1, nx*nx);
     B_dwork = reshape(B, 1, nu*nx);
     
@@ -280,6 +281,9 @@ function Derivatives(block)
 
 function SetInputPortSamplingMode(block, port, mode)
     block.InputPort(port).SamplingMode = mode;
+%     block.OutputPort(1).SamplingMode = mode;
+%     block.OutputPort(2).SamplingMode = mode;
+%     block.OutputPort(3).SamplingMode = mode;
     
 %end SetInputPortSamplingMode
 
@@ -289,24 +293,6 @@ function SetInputPortSamplingMode(block, port, mode)
 %%   Required         : Yes
 %%   C MEX counterpart: mdlTerminate
 %%
-
-function SetInpPortDims(block, idx, di)
-  
-  block.InputPort(idx).Dimensions = di;
-
-%endfunction
-
-function SetOutPortDims(block, idx, di)
-  
-    % Get dimentions of state and input vectors
-    nu = block.InputPort(1).Dimensions; % Length of input vector
-    nx = block.InputPort(2).Dimensions; % Length of state vector
-
-    block.OutputPort(1).Dimensions = [nx, nx]; % A
-    block.OutputPort(2).Dimensions = [nx, nu]; % B
-
-%endfunction
-
 function Terminate(block)
 
 %end Terminate
