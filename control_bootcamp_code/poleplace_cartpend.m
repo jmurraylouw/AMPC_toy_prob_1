@@ -6,7 +6,7 @@ L = 2;
 g = -10;
 d = 1;
 
-s = 1; % pendulum up (s=1)
+s = -1; % pendulum up (s=1)
 
 A = [0 1 0 0;
     0 -d/M -m*g/M 0;

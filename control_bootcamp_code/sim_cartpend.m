@@ -7,7 +7,7 @@ g = -9.81;
 d = 10;
 
 tspan = 0:.1:20;
-x0 = [0; 0; 0; 0];
+x0 = [0; 0; 0; 1];
 % Theta = 0, downwards
 % Theta_dot = 1, anti-clockwise
 [t,x] = ode45(@(t,x)cartpend(x,m,M,L,g,d,0),tspan,x0);
