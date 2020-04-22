@@ -24,6 +24,16 @@ setup(block);
 %%   C MEX counterpart: mdlInitializeSizes
 %%
 function setup(block)
+% Register parameters
+% parameter 1 = Ts (sample time)
+% parameter 2 = window (width of data memory window in data steps)
+% parameter 3 = nx (length of state vector)
+% parameter 4 = nu (length of input vector)
+block.NumDialogPrms     = 4;
+
+% Read dialog parameters
+nx = block.DialogPrm(3).Data;
+nu = block.DialogPrm(4).Data;
 
 % Register number of ports
 block.NumInputPorts  = 2;
@@ -35,12 +45,12 @@ block.SetPreCompOutPortInfoToDynamic;
 
 % Override INPUT port properties
 % u (input vector)
-block.InputPort(1).Dimensions = -1
+block.InputPort(1).Dimensions        = nu;
 block.InputPort(1).DatatypeID        = 0;  % double
 block.InputPort(1).Complexity        = 'Real';
 
 % x (state vector)
-block.InputPort(2).Dimensions = -1
+block.InputPort(2).Dimensions        = nx;
 block.InputPort(2).DatatypeID        = 0;  % double
 block.InputPort(2).Complexity        = 'Real';
 
@@ -50,23 +60,19 @@ block.InputPort(2).Complexity        = 'Real';
 block.OutputPort(1).DatatypeID       = 0; % double
 block.OutputPort(1).Complexity       = 'Real';
 block.OutputPort(1).SamplingMode     = 'Sample';
+block.OutputPort(1).Dimensions       = [nx, nx];
 
 % B (Input matrix)
 block.OutputPort(2).DatatypeID       = 0; % double
 block.OutputPort(2).Complexity       = 'Real';
 block.OutputPort(2).SamplingMode     = 'Sample';
+block.OutputPort(2).Dimensions       = [nx, nu];
 
 % Mean Squared Error
 block.OutputPort(3).Dimensions       = 1;
 block.OutputPort(3).DatatypeID       = 0; % double
 block.OutputPort(3).Complexity       = 'Real';
 block.OutputPort(3).SamplingMode     = 'Sample';
-
-
-% Register parameters
-% parameter 1 = Ts (sample time)
-% parameter 2 = window (width of data memory window in data steps)
-block.NumDialogPrms     = 2;
 
 % Register sample times
 %  [0 offset]            : Continuous sample time
@@ -101,8 +107,6 @@ block.RegBlockMethod('Update', @Update);
 block.RegBlockMethod('Derivatives', @Derivatives);
 block.RegBlockMethod('Terminate', @Terminate); % Required
 block.RegBlockMethod('SetInputPortSamplingMode', @SetInputPortSamplingMode);
-block.RegBlockMethod('SetInputPortDimensions', @SetInpPortDims);
-block.RegBlockMethod('SetOutputPortDimensions', @SetOutPortDims);
   
 %end setup
 
@@ -234,8 +238,8 @@ function Outputs(block)
     % Based on DMD control example video by Steve Brunton
     XU = [X; U];
     AB = X2*pinv(XU);
-    A  = AB(:,1:2);
-    B  = AB(:,end);
+    A  = AB(:,1:nx);
+    B  = AB(:,(nx+1):end);
        
     % Output
     block.OutputPort(1).Data = A;
@@ -290,22 +294,6 @@ function SetInputPortSamplingMode(block, port, mode)
 %%   C MEX counterpart: mdlTerminate
 %%
 
-function SetInpPortDims(block, idx, di)
-  
-  block.InputPort(idx).Dimensions = di;
-
-%endfunction
-
-function SetOutPortDims(block, idx, di)
-  
-    % Get dimentions of state and input vectors
-    nu = block.InputPort(1).Dimensions; % Length of input vector
-    nx = block.InputPort(2).Dimensions; % Length of state vector
-
-    block.OutputPort(1).Dimensions = [nx, nx]; % A
-    block.OutputPort(2).Dimensions = [nx, nu]; % B
-
-%endfunction
 
 function Terminate(block)
 
