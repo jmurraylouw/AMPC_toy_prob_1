@@ -157,22 +157,21 @@ function InitializeConditions(block)
 %%   C MEX counterpart: mdlStart
 %%
 function Start(block)
-    size_B = size(block.DialogPrm(2).Data);
-    size_C = size(block.DialogPrm(3).Data);
+    A = block.DialogPrm(1).Data   
+    Q = block.DialogPrm(6).Data
+    size_B = size(block.DialogPrm(2).Data)
     nx = size_B(1)
-    nu = size_B(2)
-    ny = size_C(1)
     
     % Inititialise variables    
-    x_hat = block.DialogPrm(8);
-    P = block.DialogPrm(9);
+    x_hat = block.DialogPrm(8).Data
+    P = block.DialogPrm(9).Data
     
-    x_hat = A*x_hat + B*u; % Extrapolate state
+    x_hat = A*x_hat; % Extrapolate state
     P = A*P*A' + Q; % Extrapolate uncertainty
 
     % Assign to memory/Dwork
     block.Dwork(1).Data = x_hat;
-    block.Dwork(2).Data = reshape(P, 1, nx*nx);;
+    block.Dwork(2).Data = reshape(P, 1, nx*nx);
 %end Start
 
 %%
