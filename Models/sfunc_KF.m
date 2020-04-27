@@ -25,9 +25,9 @@ setup(block);
 %%
 function setup(block)
 % Register parameters
-% parameter 1 = A
-% parameter 2 = B
-% parameter 3 = C
+% parameter 1 = F
+% parameter 2 = G
+% parameter 3 = H
 % parameter 4 = D
 % parameter 5 = Ts (sample time)
 % parameter 6 = Q
@@ -38,11 +38,11 @@ function setup(block)
 block.NumDialogPrms     = 9;
 
 % Read dialog parameters
-size_B = size(block.DialogPrm(2).Data);
-size_C = size(block.DialogPrm(3).Data);
-nx = size_B(1);
-nu = size_B(2);
-ny = size_C(1);
+size_G = size(block.DialogPrm(2).Data);
+size_H = size(block.DialogPrm(3).Data);
+nx = size_G(1);
+nu = size_G(2);
+ny = size_H(1);
 
 % Register number of ports
 block.NumInputPorts  = 2;
@@ -118,8 +118,8 @@ function DoPostPropSetup(block)
 
     block.NumDworks = 2;
 
-    size_B = size(block.DialogPrm(2).Data);
-    nx = size_B(1);
+    size_G = size(block.DialogPrm(2).Data);
+    nx = size_G(1);
     
     block.Dwork(1).Name            = 'x_hat';
     block.Dwork(1).Dimensions      = nx;
@@ -157,17 +157,17 @@ function InitializeConditions(block)
 %%   C MEX counterpart: mdlStart
 %%
 function Start(block)
-    A = block.DialogPrm(1).Data   
-    Q = block.DialogPrm(6).Data
-    size_B = size(block.DialogPrm(2).Data)
-    nx = size_B(1)
+    F = block.DialogPrm(1).Data;   
+    Q = block.DialogPrm(6).Data;
+    size_G = size(block.DialogPrm(2).Data);
+    nx = size_G(1);
     
     % Inititialise variables    
-    x_hat = block.DialogPrm(8).Data
-    P = block.DialogPrm(9).Data
+    x_hat = block.DialogPrm(8).Data;
+    P = block.DialogPrm(9).Data;
     
-    x_hat = A*x_hat; % Extrapolate state
-    P = A*P*A' + Q; % Extrapolate uncertainty
+    x_hat = F*x_hat; % Priori estimation / Extrapolate state
+    P = F*P*F' + Q; % Extrapolate uncertainty
 
     % Assign to memory/Dwork
     block.Dwork(1).Data = x_hat;
@@ -183,38 +183,38 @@ function Start(block)
 %%
 function Outputs(block)
     % Dialog parameters
-    A = block.DialogPrm(1).Data;
-    B = block.DialogPrm(2).Data;
-    C = block.DialogPrm(3).Data;
+    F = block.DialogPrm(1).Data;
+    G = block.DialogPrm(2).Data;
+    H = block.DialogPrm(3).Data;
     Q = block.DialogPrm(6).Data;
     R = block.DialogPrm(7).Data;
     
-    size_B = size(B);
-    size_C = size(C);
-    nx = size_B(1);
-    nu = size_B(2);
-    ny = size_C(1);
+    size_G = size(G);
+    size_H = size(H);
+    nx = size_G(1);
+    nu = size_G(2);
+    ny = size_H(1);
 
     % Input
     u       = block.InputPort(1).Data;
     y       = block.InputPort(2).Data;
     
     %Dwork data
-    x_hat = block.Dwork(1).Data;
+    x_hat = block.Dwork(1).Data; % Priori estimation 
     P = reshape(block.Dwork(2).Data, nx, nx);
     
-    % Calculation
-    K = (P*C')/(C*P*C' + R); % Compute Kalman gain (b*inv(A) -> b/A)
-    x_hat = x_hat + K*(y - C*x_hat); % Update estimate with measurement
-    KC_term = (eye(nx) - K*C);
-    P = KC_term*P*KC_term' + K*R*K'; % Update estimate uncertainty
+    % Update step
+    K = (P*H')/(H*P*H' + R); % Compute Kalman gain (b*inv(A) -> b/A)
+    x_hat = x_hat + K*(y - H*x_hat); % Posteriori / With measurement
+    KH_term = (eye(nx) - K*H);
+    P = KH_term*P*KH_term' + K*R*K'; % Update estimate uncertainty
    
     % Output
     block.OutputPort(1).Data = x_hat;
     
     % Extrapulate/Prediction for next time step
-    x_hat = A*x_hat + B*u; % Extrapolate state
-    P = A*P*A' + Q; % Extrapolate uncertainty
+    x_hat = F*x_hat + G*u; % Priori estimation / Extrapolate state
+    P = F*P*F' + Q; % Extrapolate uncertainty
 
     % Update Dwork memory   
     block.Dwork(1).Data = x_hat;
