@@ -1,5 +1,5 @@
 function dx = cartpend(x,m,M,L,g,d,u)
-
+% By Steve Brunton
 Sx = sin(x(3));
 Cx = cos(x(3));
 D = m*L*L*(M+m*(1-Cx^2));

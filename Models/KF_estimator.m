@@ -20,7 +20,7 @@ D = 0;
 Ts = t(2)-t(1);
 sys_c = ss(A,B,C,D);
 sys_d = c2d(sys_c, Ts);
-[A,B,C,D] = ssdata(sys_d);
+[F,G,H,D] = ssdata(sys_d);
 
 x_hat_data = zeros(nx, n_time);
 
