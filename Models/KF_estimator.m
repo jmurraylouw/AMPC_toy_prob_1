@@ -13,19 +13,19 @@ m = 1;
 b = 0.01;
 k = 5;
 
-A = [0, 1; -k/m, -b/m];
-B = [0; 1/m];
-C = [1, 0];
+F= [0, 1; -k/m, -b/m];
+G = [0; 1/m];
+H = [1, 0];
 D = 0;
 Ts = t(2)-t(1);
-sys_c = ss(A,B,C,D);
+sys_c = ss(F,G,H,D);
 sys_d = c2d(sys_c, Ts);
 [F,G,H,D] = ssdata(sys_d);
 
 x_hat_data = zeros(nx, n_time);
 
 sigma_a = 0.1; % Std dev of acceleration/force applied to model
-Q = B*(sigma_a^2)*B'
+Q = G*(sigma_a^2)*G'
 R = 0.01;
 
 % Initialise
@@ -34,8 +34,8 @@ P0 = [0, 0; 0, 0];
 x_hat = x0;
 P = P0;
 
-x_hat_dwork = A*x_hat + B*u; % Extrapolate state
-P_dwork = A*P*A' + Q; % Extrapolate uncertainty
+x_hat_dwork = F*x_hat + G*u; % Extrapolate state
+P_dwork = F*P*F' + Q; % Extrapolate uncertainty
 
  
 for n = 1:1:n_time-1
@@ -47,16 +47,16 @@ for n = 1:1:n_time-1
     x_hat = x_hat_dwork;
     P = P_dwork;
     
-    K = (P*C')/(C*P*C' + R); % Compute Kalman gain (b*inv(A) -> b/A)
-    x_hat = x_hat + K*(y - C*x_hat); % Update estimate with measurement
-    KC_term = (eye(nx) - K*C);
-    P = KC_term*P*KC_term' + K*R*K'; % Update estimate uncertainty
+    K = (P*H')/(H*P*H' + R); % Compute Kalman gain (b*inv(A) -> b/A)
+    x_hat = x_hat + K*(y - H*x_hat); % Update estimate with measurement
+    KH_term = (eye(nx) - K*H);
+    P = KH_term*P*KH_term' + K*R*K'; % Update estimate uncertainty
     
     % Output
     x_hat_data(:,n) = x_hat;
     
-    x_hat = A*x_hat + B*u; % Extrapolate state
-    P = A*P*A' + Q; % Extrapolate uncertainty
+    x_hat = F*x_hat + G*u; % Extrapolate state
+    P = F*P*F' + Q; % Extrapolate uncertainty
     
     % Save to Dwork
     x_hat_dwork = x_hat;
