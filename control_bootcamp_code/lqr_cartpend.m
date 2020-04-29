@@ -3,8 +3,8 @@ clear all, close all, clc
 m = 1;
 M = 5;
 L = 2;
-g = -10;
-d = 1;
+g = -9.81;
+d = 10;
 
 s = -1; % pendulum up (s = 1), pend down (s = -1)
 

@@ -34,8 +34,7 @@ P0 = [0, 0; 0, 0];
 x_hat = x0;
 P = P0;
 
-x_hat_dwork = F*x_hat + G*u; % Extrapolate state
-P_dwork = F*P*F' + Q; % Extrapolate uncertainty
+
 
  
 for n = 1:1:n_time-1
