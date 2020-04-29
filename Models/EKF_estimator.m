@@ -1,3 +1,5 @@
+close all;
+
 % Read simulation data
 x_data = out.x.Data';
 y_data = out.y.Data';
@@ -6,12 +8,9 @@ t = out.x.Time';
 % Dimensions
 [nx, n_time] = size(x_data)
 [ny, n_time] = size(y_data)
-nx = 6
-ny = 3
-n_time
 
 % Initialise
-x0 = [0; 0; 0; 1; 0; 1];
+x0 = [0; 0; 0; 0; 0; 1];
 P0 = 0.01*eye(nx);
 x_hat = x0;
 P = P0;
@@ -24,19 +23,29 @@ g = -9.81;
 d = 1;
 
 f = @cartpend; % Function handle
-[f_x,F] = jaccsd(f,x0)
+[f_x,A] = jaccsd(f,x0);
+B = zeros(nx,1);
+C = eye(6);
+% C = [1 0 0 0 0 0;
+%      0 0 1 0 0 0;
+%      0 0 0 0 1 0;
+%      0 0 0 0 0 1]; % Measure x, theta, u, m
+D = 0;
 
-H = [1 0 0 0 0 0;
-     0 0 1 0 0 0;
-     0 0 0 0 1 0;] % Measure x, theta, u
+A
+
+sys_c = ss(A,B,C,D); % Continuous system
+sys_d = c2d(sys_c, Ts, 'zoh'); % Discrete system
+[F,B,H,D] = ssdata(sys_d);
 
 sigma_a = 0.1; % Std dev of acceleration/force applied to model
-Q = 0.001*eye(nx); % Model uncertainty
-R = 0.01*eye(ny); % Measurement uncertainty
+Q = 0.01*eye(nx); % Model uncertainty
+Q(5,5) = 0.1; % Very uncertain about u, because it does not stay constant
+Q(6,6) = 0.0001;
+R = 0.0001*eye(ny); % Measurement uncertainty
 
 % Extrapolate
-x_hat_dwork = F*x_hat % Extrapolate state
-pause
+x_hat_dwork = F*x_hat; % Extrapolate state
 P_dwork = F*P*F' + Q; % Extrapolate uncertainty
 
 x_hat_data = zeros(nx, n_time); % Assign memory beforehand
@@ -61,13 +70,11 @@ for n = 1:1:n_time-1
     x_hat_data(:,n) = x_hat;
     
     % Linearise system equations
-
     [f_x,A] = jaccsd(f,x_hat);
+    sys_c = ss(A,B,C,D); % Continuous system
+    sys_d = c2d(sys_c, Ts, 'zoh'); % Discrete system
+    [F,B,H,D] = ssdata(sys_d);
     
-    x_hat
-    f_x
-    F
-    pause
     % Extrapolate for next time step
     x_hat = F*x_hat; % Extrapolate state
     P = F*P*F' + Q; % Extrapolate uncertainty
@@ -78,11 +85,14 @@ for n = 1:1:n_time-1
     
 end
 
+plot_rows = [1 3 5 6];
+figure
+plot(t, x_data(plot_rows,:)); hold on
 
-plot(t, x_data(3,:)); hold on;
+% plot(t, y_data);
 
-plot(t, x_hat_data(3,:));
-%plot(t, y_data);
+plot(t, x_hat_data(plot_rows,:));
+
 hold off;
 legend('Actual', 'Estimate', 'Measured')
 

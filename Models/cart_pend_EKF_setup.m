@@ -7,7 +7,7 @@ ny = 2;
 m = 1;
 M = 5;
 L = 2;
-g = -10;
+g = -9.81;
 d = 10;
 
 s = -1; % pendulum up (s = 1), pend down (s = -1)
@@ -32,12 +32,12 @@ sys_d = c2d(sys_c, Ts); % Discrete system
 [F,G,H,D] = ssdata(sys_d);
 
 % Uncertainties
-sigma_a = 0.1;
+sigma_a = 0.01;
 Q = G*sigma_a^2*G'; %zeros(nx, nx);
-R = 0.00001*eye(ny);
+R = 0.0001*eye(ny);
 
 % Initial estimates
-x0 = [0; 0; 0.05; 0];
-P0 = 0.1*ones(nx, nx);
+x0 = [0; 0; 0; 0.5];
+P0 = 0.5*eye(nx, nx);
 
 disp('cart_pend KF data loaded')
