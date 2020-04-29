@@ -3,14 +3,16 @@ close all;
 % Read simulation data
 x_data = out.x.Data';
 y_data = out.y.Data';
+u_data = out.u.Data';
 t = out.x.Time';
 
 % Dimensions
 [nx, n_time] = size(x_data)
 [ny, n_time] = size(y_data)
+[nu, n_time] = size(u_data)
 
 % Initialise
-x0 = [0; 0; 0; 0; 0; 1];
+x0 = [0; 0; 0; 0; 1];
 P0 = 0.01*eye(nx);
 x_hat = x0;
 P = P0;
@@ -23,9 +25,9 @@ g = -9.81;
 d = 1;
 
 f = @cartpend; % Function handle
-[f_x,A] = jaccsd(f,x0);
-B = zeros(nx,1);
-C = eye(6);
+[f_x,A] = jaccsd(f,x0,u);
+B = [0; 1/M; 0; s*1/(M*L); 0]; % ?? Later change jaccsd to also compute B
+C = eye(nx);
 % C = [1 0 0 0 0 0;
 %      0 0 1 0 0 0;
 %      0 0 0 0 1 0;
@@ -40,12 +42,10 @@ sys_d = c2d(sys_c, Ts, 'zoh'); % Discrete system
 
 sigma_a = 0.1; % Std dev of acceleration/force applied to model
 Q = 0.01*eye(nx); % Model uncertainty
-Q(5,5) = 0.1; % Very uncertain about u, because it does not stay constant
-Q(6,6) = 0.0001;
 R = 0.0001*eye(ny); % Measurement uncertainty
 
 % Extrapolate
-x_hat_dwork = F*x_hat; % Extrapolate state
+x_hat_dwork = F*x_hat + B*u; % Extrapolate state
 P_dwork = F*P*F' + Q; % Extrapolate uncertainty
 
 x_hat_data = zeros(nx, n_time); % Assign memory beforehand
@@ -70,13 +70,13 @@ for n = 1:1:n_time-1
     x_hat_data(:,n) = x_hat;
     
     % Linearise system equations
-    [f_x,A] = jaccsd(f,x_hat);
+    [f_x,A] = jaccsd(f,x_hat,u);
     sys_c = ss(A,B,C,D); % Continuous system
     sys_d = c2d(sys_c, Ts, 'zoh'); % Discrete system
     [F,B,H,D] = ssdata(sys_d);
     
     % Extrapolate for next time step
-    x_hat = F*x_hat; % Extrapolate state
+    x_hat = F*x_hat + B*u; % Extrapolate state
     P = F*P*F' + Q; % Extrapolate uncertainty
     
     % Save to Dwork
@@ -85,7 +85,7 @@ for n = 1:1:n_time-1
     
 end
 
-plot_rows = [1 3 5 6];
+plot_rows = [1 3 5];
 figure
 plot(t, x_data(plot_rows,:)); hold on
 
@@ -117,21 +117,17 @@ dx(2,1) = 1/m*(-k*x(1)^3 - b*x(2) + u);
 end
 
 
-function dx = cartpend(x)
+function dx = cartpend(x,u)
 % Adapted from code by Steve Brunton
 % x contains state, input and parameters
 % x = [x;
 %     x_dot;
 %     theta;
 %     theta_dot;
-%     u (force on cart)
 %     m;]
 
-% Input
-u = x(5);
-
 % Parameter vector
-m = x(6);
+m = x(5);
 M = 5;
 L = 2;
 g = -9.81;
@@ -147,7 +143,6 @@ dx(2,1) = (1/D)*(-m^2*L^2*g*Cx*Sx + m*L^2*(m*L*x(4)^2*Sx - d*x(2))) + m*L*L*(1/D
 dx(3,1) = x(4);
 dx(4,1) = (1/D)*((m+M)*m*g*L*Sx - m*L*Cx*(m*L*x(4)^2*Sx - d*x(2))) - m*L*Cx*(1/D)*u; % +.01*randn;
 dx(5,1) = 0;
-dx(6,1) = 0;
 
 end
 % Old cartpend:
@@ -173,22 +168,23 @@ dx(4,1) = (1/D)*((m+M)*m*g*L*Sx - m*L*Cx*(m*L*x(4)^2*Sx - d*x(2))) - m*L*Cx*(1/D
 end
 %}
 
-function [f_x,J]=jaccsd(f,x) % ??? Maybe should use simbolic diff for more exact
+function [f_x,J]=jaccsd(f,x,u) % ??? Maybe should use simbolic diff for more exact
 % JACCSD Jacobian through complex step differentiation
 % By Yi Cao at Cranfield University, 02/01/2008
 % [z J] = jaccsd(f,x)
 % z = f(x)
 % J = f'(x)
 %
-f_x = f(x);
+f_x = f(x,u);
 n = numel(x);
 m = numel(f_x);
 J = zeros(m,n);
+% ?? Maybe later add calculation of B also
 h = n*eps;
 for k=1:n
     x1 = x;
     x1(k) = x1(k)+ h*1i;
-    J(:,k) = imag(f(x1))/h;
+    J(:,k) = imag(f(x1,u))/h;
 end
 end
 
