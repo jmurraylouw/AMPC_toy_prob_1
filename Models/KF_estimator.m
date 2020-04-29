@@ -13,12 +13,12 @@ m = 1;
 b = 0.01;
 k = 5;
 
-F= [0, 1; -k/m, -b/m];
-G = [0; 1/m];
-H = [1, 0];
+A= [0, 1; -k/m, -b/m];
+B = [0; 1/m];
+C = [1, 0];
 D = 0;
 Ts = t(2)-t(1);
-sys_c = ss(F,G,H,D);
+sys_c = ss(A,B,C,D);
 sys_d = c2d(sys_c, Ts);
 [F,G,H,D] = ssdata(sys_d);
 
@@ -41,7 +41,7 @@ P_dwork = F*P*F' + Q; % Extrapolate uncertainty
 for n = 1:1:n_time-1
     % Measurement
     y = y_data(n);
-    u = u_data(:,n);
+    u = u_data(:,n); %% ?? Shouldn't u be in y, since it is measured?
     
     % Get saved data
     x_hat = x_hat_dwork;

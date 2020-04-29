@@ -2,7 +2,7 @@
 
 nx = 4; % [x; x_dot; theta; theta_dot]
 nu = 1; % f (horizontal force on cart)
-ny = 4;
+ny = 2;
 
 m = 1;
 M = 5;
@@ -20,9 +20,9 @@ A = [0 1 0 0;
 
 B = [0; 1/M; 0; s*1/(M*L)];
 
-C = eye(4);
-%C = [1 0 0 0;
-%     0 0 1 0];
+% C = eye(4);
+C = [1 0 0 0;
+     0 0 1 0];
 D = 0;
 
 % Discritize System

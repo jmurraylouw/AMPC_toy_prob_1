@@ -1,57 +1,22 @@
-% KF
-%{
-x_hat_data = zeros(nx, n_time);
+% Read simulation data
+u_data = out.f.Data';
+x_data = out.x.Data';
+y_data = out.y.Data';
+t = out.x.Time';
 
-sigma_a = 0.1; % Std dev of acceleration/force applied to model
-Q = G*(sigma_a^2)*G'
-R = 0.01;
+% Dimensions
+[nx, n_time] = size(x_data);
+[nu, n_time] = size(u_data);
+[ny, n_time] = size(y_data);
+nx
+nu
+ny
+n_time
 
-% Initialise
-x0 = [0; 0];
-P0 = [0, 0; 0, 0];
-x_hat = x0;
-P = P0;
-
-x_hat_dwork = F*x_hat + G*u; % Extrapolate state
-P_dwork = F*P*F' + Q; % Extrapolate uncertainty
-
- 
-for n = 1:1:n_time-1
-    % Measurement
-    y = y_data(n);
-    u = u_data(:,n);
-    
-    % Get saved data
-    x_hat = x_hat_dwork;
-    P = P_dwork;
-    
-    K = (P*H')/(H*P*H' + R); % Compute Kalman gain (b*inv(A) -> b/A)
-    x_hat = x_hat + K*(y - H*x_hat); % Update estimate with measurement
-    KH_term = (eye(nx) - K*H);
-    P = KH_term*P*KH_term' + K*R*K'; % Update estimate uncertainty
-    
-    % Output
-    x_hat_data(:,n) = x_hat;
-    
-    x_hat = F*x_hat + G*u; % Extrapolate state
-    P = F*P*F' + Q; % Extrapolate uncertainty
-    
-    % Save to Dwork
-    x_hat_dwork = x_hat;
-    P_dwork = P;
-    
-end
-
-plot(t, x_data(1,:)); hold on;
-
-plot(t, x_hat_data(1,:));
-%plot(t, y_data);
-hold off;
-legend('Actual', 'Estimate', 'Measured')
-%}
 f = @cartpend; % Function handle
 x = [0; 0; 0; 0];
 
+% System definition
 m = 1;
 M = 5;
 L = 2;
@@ -61,6 +26,8 @@ c = [m; M; L; g; d];
 
 u = 1;
 [f_x,J] = jaccsd(f,x,c,u)
+
+
 
 function dx = nl_msd(x,c,u)
 % NON-LINEAR MASS SPRING DAMPER

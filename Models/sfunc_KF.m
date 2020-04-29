@@ -25,9 +25,9 @@ setup(block);
 %%
 function setup(block)
 % Register parameters
-% parameter 1 = F
-% parameter 2 = G
-% parameter 3 = H
+% parameter 1 = A
+% parameter 2 = B
+% parameter 3 = C
 % parameter 4 = D
 % parameter 5 = Ts (sample time)
 % parameter 6 = Q
@@ -38,11 +38,11 @@ function setup(block)
 block.NumDialogPrms     = 9;
 
 % Read dialog parameters
-size_G = size(block.DialogPrm(2).Data);
-size_H = size(block.DialogPrm(3).Data);
-nx = size_G(1);
-nu = size_G(2);
-ny = size_H(1);
+size_B = size(block.DialogPrm(2).Data);
+size_C = size(block.DialogPrm(3).Data);
+nx = size_B(1);
+nu = size_B(2);
+ny = size_C(1);
 
 % Register number of ports
 block.NumInputPorts  = 2;
@@ -118,8 +118,8 @@ function DoPostPropSetup(block)
 
     block.NumDworks = 2;
 
-    size_G = size(block.DialogPrm(2).Data);
-    nx = size_G(1);
+    size_B = size(block.DialogPrm(2).Data);
+    nx = size_B(1);
     
     block.Dwork(1).Name            = 'x_hat';
     block.Dwork(1).Dimensions      = nx;
@@ -157,10 +157,24 @@ function InitializeConditions(block)
 %%   C MEX counterpart: mdlStart
 %%
 function Start(block)
-    F = block.DialogPrm(1).Data;   
+    % Read dialog parameters    
+    A = block.DialogPrm(1).Data;
+    B = block.DialogPrm(2).Data;
+    C = block.DialogPrm(3).Data;
+    D = block.DialogPrm(4).Data;
+    Ts = block.DialogPrm(5).Data;
     Q = block.DialogPrm(6).Data;
-    size_G = size(block.DialogPrm(2).Data);
-    nx = size_G(1);
+    R = block.DialogPrm(7).Data;
+    
+    % Convert to discrete-time system
+    % ?? can make faster by converting only once and storing in dwork
+    sys_c = ss(A,B,C,D);
+    sys_d = c2d(sys_c, Ts);
+    [F,G,H,D] = ssdata(sys_d);
+    
+    % Dimensions
+    size_B = size(block.DialogPrm(2).Data);
+    nx = size_B(1);
     
     % Inititialise variables    
     x_hat = block.DialogPrm(8).Data;
@@ -183,11 +197,18 @@ function Start(block)
 %%
 function Outputs(block)
     % Dialog parameters
-    F = block.DialogPrm(1).Data;
-    G = block.DialogPrm(2).Data;
-    H = block.DialogPrm(3).Data;
+    A = block.DialogPrm(1).Data;
+    B = block.DialogPrm(2).Data;
+    C = block.DialogPrm(3).Data;
+    D = block.DialogPrm(4).Data;
+    Ts = block.DialogPrm(5).Data;
     Q = block.DialogPrm(6).Data;
     R = block.DialogPrm(7).Data;
+    
+    % Convert to discrete-time system
+    sys_c = ss(A,B,C,D);
+    sys_d = c2d(sys_c, Ts);
+    [F,G,H,D] = ssdata(sys_d);
     
     size_G = size(G);
     size_H = size(H);
