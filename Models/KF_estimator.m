@@ -1,4 +1,5 @@
-u_data = out.f.Data';
+% Read simulation data
+u_data = out.u.Data';
 x_data = out.x.Data';
 y_data = out.y.Data';
 t = out.x.Time';
@@ -25,18 +26,15 @@ sys_d = c2d(sys_c, Ts);
 x_hat_data = zeros(nx, n_time);
 
 sigma_a = 0.1; % Std dev of acceleration/force applied to model
-Q = G*(sigma_a^2)*G'
-R = 0.01;
+Q = 0.000001*eye(nx); % Model uncertainty
+R = 0.01*eye(ny); % Measurement uncertainty
 
 % Initialise
 x0 = [0; 0];
 P0 = [0, 0; 0, 0];
-x_hat = x0;
-P = P0;
+x_hat_dwork = x0;
+P_dwork = P0;
 
-
-
- 
 for n = 1:1:n_time-1
     % Measurement
     y = y_data(n);
@@ -62,7 +60,7 @@ for n = 1:1:n_time-1
     P_dwork = P;
     
 end
-
+figure
 plot(t, x_data(1,:)); hold on;
 
 plot(t, x_hat_data(1,:));
