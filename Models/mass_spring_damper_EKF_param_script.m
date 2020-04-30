@@ -1,3 +1,7 @@
+% Applies Extended Kalman Filter for 
+% simueltaneous state and parameter estimation
+% on data from Mass spring damper simulation
+
 % Read simulation data
 x_data = out.x.Data';
 y_data = out.y.Data';
@@ -9,20 +13,9 @@ t = out.x.Time';
 [ny, n_time] = size(y_data);
 [nu, n_time] = size(u_data);
 
-% System definition
-m = 1;
-b = 0.01;
-k = 5;
-
-A= [0, 1; -k/m, -b/m]
-B = [0; 1/m];
-C = [1, 0];
-D = 0;
-Ts = t(2)-t(1);
-
 % Initialise
-x0 = [0; 0];
-P0 = [0, 0; 0, 0];
+x0 = [0; 0; 0.8];
+P0 = 0.1*eye(nx);
 u0 = 0;
 x_hat = x0;
 P = P0;
@@ -32,7 +25,7 @@ Q = 0.000001*eye(nx); % Model uncertainty
 R = 0.01*eye(ny); % Measurement uncertainty
 
 % Extrapolate
-f = @nl_msd; % System function handle
+f = @msd_param; % System function handle
 g = @measure_msd; % Measurement function handle
 H = jaccsd(g,x_hat,u); %H = C if measurement system is linear
 
@@ -83,12 +76,13 @@ figure
 plot(t,x_data(1,:))
 hold on
 plot(t,x_hat_data(1,:))
+plot(t,x_hat_data(3,:))
 %plot(t, y_data);
 hold off
-legend('Actual', 'Estimate', 'Measured')
+legend('Actual', 'Estimate', 'estimated m', 'Measured')
 
 % Functions
-function dx = msd(x,u)
+function dx = msd_param(x,u)
     % LINEAR MASS SPRING DAMPER
     % INPUT:
     % x = state vector [x, x_dot]
@@ -96,14 +90,15 @@ function dx = msd(x,u)
     % 
     % OUTPUT:
     % dx = derivative of state vector [x_dot, x_dotdot]
-
-    m = 1; % Mass
+    
+    m = x(3); % Mass
     b = 0.01; % Damper coef
     k = 5; % Coef of spring
 
-    dx = zeros(2,1); % Assign memory
-    dx(1,1) = x(2);
-    dx(2,1) = 1/m*(-k*x(1) - b*x(2) + u);
+    dx = zeros(3,1); % Assign memory
+    dx(1,1) = x(2); % x_dot
+    dx(2,1) = 1/m*(-k*x(1) - b*x(2) + u); % x_dotdot
+    dx(3,1) = 0; % Mass stays constant, dx = 0
 end
 
 function dx = nl_msd(x,u)
