@@ -23,20 +23,22 @@ Ts = t(2)-t(1);
 % Initialise
 x0 = [0; 0];
 P0 = [0, 0; 0, 0];
+u0 = 0;
 x_hat = x0;
 P = P0;
+u = u0;
 
 Q = 0.000001*eye(nx); % Model uncertainty
 R = 0.01*eye(ny); % Measurement uncertainty
 
 % Extrapolate
-f = @msd; % System function handle
+f = @nl_msd; % System function handle
 g = @measure_msd; % Measurement function handle
-H = jaccsd(g,x_hat,0); %H = C if measurement system is linear
+H = jaccsd(g,x_hat,u); %H = C if measurement system is linear
 % ??? Change this if f is dependent on time.
-x_hat_dwork = x_hat + f(x_hat,0)*Ts; % Numeric integration to extrapolate state
+x_hat_dwork = x_hat + f(x_hat,u)*Ts; % Numeric integration to extrapolate state
 
-F = jaccsd(f,x_hat,0); % Calculate Jacobian of continuous system
+F = jaccsd(f,x_hat,u); % Calculate Jacobian of continuous system
 Phi = eye(nx) + F*Ts + 1/2*(F*Ts)^2; % ??? where is this from? 2nd order Taylor expansion? (continuous to discrete)
 P_dwork = Phi*P*Phi' + Q; % Extrapolate uncertainty
 
@@ -50,7 +52,6 @@ for n = 1:1:n_time-1
     
     % Get saved data
     x_hat = x_hat_dwork;
-    x_hat_dwork;
     P = P_dwork;
     
     % Update
@@ -80,7 +81,9 @@ figure
 plot(t,x_data(1,:))
 hold on
 plot(t,x_hat_data(1,:))
+%plot(t, y_data);
 hold off
+legend('Actual', 'Estimate', 'Measured')
 
 function dx = msd(x,u)
     % LINEAR MASS SPRING DAMPER
@@ -100,7 +103,7 @@ function dx = msd(x,u)
     dx(2,1) = 1/m*(-k*x(1) - b*x(2) + u);
 end
 
-function dx = msd(x,u)
+function dx = nl_msd(x,u)
     % NON-LINEAR MASS SPRING DAMPER
     % INPUT:
     % x = state vector [x, x_dot]
@@ -115,7 +118,7 @@ function dx = msd(x,u)
 
     dx = zeros(2,1); % Assign memory
     dx(1,1) = x(2);
-    dx(2,1) = 1/m*(-k*x(1) - b*x(2) + u);
+    dx(2,1) = 1/m*(-k*x(1)^3 - b*x(2) + u);
 end
 
 function y = measure_msd(x,u)

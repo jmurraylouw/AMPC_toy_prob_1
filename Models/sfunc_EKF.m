@@ -1,4 +1,4 @@
-function sfunc_KF(block)
+function sfunc_EKF(block)
 %sfunc_DMDc_MW - Applies Dynamic Mode Decomposition with Control and a
 %Moving Window of past input data to obtain the state space system matrixes
 
@@ -25,24 +25,27 @@ setup(block);
 %%
 function setup(block)
 % Register parameters
-% parameter 1 = A
-% parameter 2 = B
-% parameter 3 = C
-% parameter 4 = D
-% parameter 5 = Ts (sample time)
-% parameter 6 = Q
-% parameter 7 = R
-% parameter 8 = x0
-% parameter 9 = P0
-% A,B,C,D,Ts,Q,R,x0,P0
-block.NumDialogPrms     = 9;
+% parameter 1 = Ts (sample time)
+% parameter 2 = f ( dx = f(x,u) Continuous state function handle)
+% parameter 3 = g ( y = g(x,u) Continuous measurement function handle)
+% parameter 4 = Q (Process Noise/Model Uncertainty)
+% parameter 5 = R (Measurement Noise Uncertainty)
+% parameter 6 = x0 (Estimate of initial state)
+% parameter 7 = P0 (Initial estimate uncertainty)
+% parameter 8 = u0 (Estimate of initial input)
+% Ts,f,g,Q,R,x0,P0,u0
+block.NumDialogPrms = 8;
 
 % Read dialog parameters
-size_B = size(block.DialogPrm(2).Data);
-size_C = size(block.DialogPrm(3).Data);
-nx = size_B(1);
-nu = size_B(2);
-ny = size_C(1);
+Ts = block.DialogPrm(1).Data;
+g = block.DialogPrm(3).Data;
+x0 = block.DialogPrm(6).Data;
+u0 = block.DialogPrm(8).Data;
+
+y0 = g(x0,u0);
+nx = length(x0);
+nu = length(u0);
+ny = length(y0);
 
 % Register number of ports
 block.NumInputPorts  = 2;
@@ -77,7 +80,7 @@ block.OutputPort(1).Dimensions       = [nx, 1];
 %
 %  [-1, 0]               : Inherited sample time
 %  [-2, 0]               : Variable sample time
-block.SampleTimes = [block.DialogPrm(5).Data 0]; % Set sample time
+block.SampleTimes = [Ts 0]; % Set sample time
 
 % Specify the block simStateCompliance. The allowed values are:
 %    'UnknownSimState', < The default setting; warn and assume DefaultSimState
@@ -104,7 +107,7 @@ block.RegBlockMethod('Update', @Update);
 block.RegBlockMethod('Derivatives', @Derivatives);
 block.RegBlockMethod('Terminate', @Terminate); % Required
 block.RegBlockMethod('SetInputPortSamplingMode', @SetInputPortSamplingMode);
-  
+%block.RegBlockMethod('jaccsd', @jaccsd);  
 %end setup
 
 %%
@@ -117,9 +120,10 @@ block.RegBlockMethod('SetInputPortSamplingMode', @SetInputPortSamplingMode);
 function DoPostPropSetup(block)
 
     block.NumDworks = 2;
-
-    size_B = size(block.DialogPrm(2).Data);
-    nx = size_B(1);
+    
+    % Read dialog parameters
+    x0 = block.DialogPrm(6).Data;
+    nx = length(x0);
     
     block.Dwork(1).Name            = 'x_hat';
     block.Dwork(1).Dimensions      = nx;
@@ -157,31 +161,30 @@ function InitializeConditions(block)
 %%   C MEX counterpart: mdlStart
 %%
 function Start(block)
-    % Read dialog parameters    
-    A = block.DialogPrm(1).Data;
-    B = block.DialogPrm(2).Data;
-    C = block.DialogPrm(3).Data;
-    D = block.DialogPrm(4).Data;
-    Ts = block.DialogPrm(5).Data;
-    Q = block.DialogPrm(6).Data;
-    R = block.DialogPrm(7).Data;
-    
-    % Convert to discrete-time system
-    % ?? can make faster by converting only once and storing in dwork
-    sys_c = ss(A,B,C,D);
-    sys_d = c2d(sys_c, Ts);
-    [F,G,H,D] = ssdata(sys_d);
-    
+    % Read dialog parameters
+    Ts = block.DialogPrm(1).Data;
+    f = block.DialogPrm(2).Data;
+    Q = block.DialogPrm(4).Data;
+    x0 = block.DialogPrm(6).Data;
+    P0 = block.DialogPrm(7).Data;
+    u0 = block.DialogPrm(8).Data;
+
     % Dimensions
-    size_B = size(block.DialogPrm(2).Data);
-    nx = size_B(1);
+    nx = length(x0);
     
-    % Inititialise variables    
-    x_hat = block.DialogPrm(8).Data;
-    P = block.DialogPrm(9).Data;
+    x_hat = x0;
+    P = P0;
+    u = u0;
     
-    x_hat = F*x_hat; % Priori estimation / Extrapolate state
-    P = F*P*F' + Q; % Extrapolate uncertainty
+    % Linearise by calculating Jacobians
+    F = jaccsd(block,f,x_hat,u); % Calculate Jacobian of continuous system
+   
+    % Extrapolate
+    % ??? Change this if f is dependent on time.
+    x_hat = x_hat + f(x_hat,u)*Ts; % Numeric integration to extrapolate state
+
+    Phi = eye(nx) + F*Ts + 1/2*(F*Ts)^2; % ??? where is this from? 2nd order Taylor expansion? (continuous to discrete)
+    P = Phi*P*Phi' + Q; % Extrapolate uncertainty
 
     % Assign to memory/Dwork
     block.Dwork(1).Data = x_hat;
@@ -196,35 +199,27 @@ function Start(block)
 %%   C MEX counterpart: mdlOutputs
 %%
 function Outputs(block)
-    % Dialog parameters
-    A = block.DialogPrm(1).Data;
-    B = block.DialogPrm(2).Data;
-    C = block.DialogPrm(3).Data;
-    D = block.DialogPrm(4).Data;
-    Ts = block.DialogPrm(5).Data;
-    Q = block.DialogPrm(6).Data;
-    R = block.DialogPrm(7).Data;
+    % Read dialog parameters
+    Ts = block.DialogPrm(1).Data;
+    f = block.DialogPrm(2).Data;
+    g = block.DialogPrm(3).Data;
+    Q = block.DialogPrm(4).Data;
+    R = block.DialogPrm(5).Data;
+    x0 = block.DialogPrm(6).Data;
+    u0 = block.DialogPrm(8).Data;
+ 
+    nx = length(x0);
     
-    % Convert to discrete-time system
-    sys_c = ss(A,B,C,D);
-    sys_d = c2d(sys_c, Ts);
-    [F,G,H,D] = ssdata(sys_d);
-    
-    size_G = size(G);
-    size_H = size(H);
-    nx = size_G(1);
-    nu = size_G(2);
-    ny = size_H(1);
-
     % Input
-    u       = block.InputPort(1).Data;
-    y       = block.InputPort(2).Data;
+    u = block.InputPort(1).Data;
+    y = block.InputPort(2).Data;
     
-    %Dwork data
+    % Dwork data
     x_hat = block.Dwork(1).Data; % Priori estimation 
     P = reshape(block.Dwork(2).Data, nx, nx);
     
     % Update step
+    H = jaccsd(block,g,x_hat,u); % Linearise measurement function
     K = (P*H')/(H*P*H' + R); % Compute Kalman gain (b*inv(A) -> b/A)
     x_hat = x_hat + K*(y - H*x_hat); % Posteriori / With measurement
     KH_term = (eye(nx) - K*H);
@@ -234,8 +229,12 @@ function Outputs(block)
     block.OutputPort(1).Data = x_hat;
     
     % Extrapulate/Prediction for next time step
-    x_hat = F*x_hat + G*u; % Priori estimation / Extrapolate state
-    P = F*P*F' + Q; % Extrapolate uncertainty
+    x_hat = x_hat + f(x_hat,u)*Ts; % Numeric integration (extrapolate state)
+    % ??? Needs to change to proper num integration if dependent on time
+    
+    F = jaccsd(block,f,x_hat,0); % Calculate Jacobian of continuous system
+    Phi = eye(nx) + F*Ts + 0.5*(F*Ts)^2; % 2nd order Taylor expansion (continuous to discrete)
+    P = Phi*P*Phi' + Q; % Extrapolate uncertainty
 
     % Update Dwork memory   
     block.Dwork(1).Data = x_hat;
@@ -278,6 +277,23 @@ function SetInputPortSamplingMode(block, port, mode)
 %%   C MEX counterpart: mdlTerminate
 %%
 
+function J = jaccsd(block, f,x,u) % ??? Maybe should use simbolic diff for more exact
+    % JACCSD Jacobian through complex step differentiation
+    % By Yi Cao at Cranfield University, 02/01/2008
+    % [z J] = jaccsd(f,x)
+    % z = f(x)
+    % J = f'(x)
+    %
+    f_x = f(x,u);
+    n = numel(x);
+    m = numel(f_x);
+    J = zeros(m,n);
+    h = n*eps;
+    for k=1:n
+        x1 = x;
+        x1(k) = x1(k)+ h*1i;
+        J(:,k) = imag(f(x1,u))/h;
+    end
 
 function Terminate(block)
 
