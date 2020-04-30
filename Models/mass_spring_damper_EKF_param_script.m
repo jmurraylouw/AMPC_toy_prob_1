@@ -12,9 +12,13 @@ t = out.x.Time';
 [nx, n_time] = size(x_data);
 [ny, n_time] = size(y_data);
 [nu, n_time] = size(u_data);
+nx = 2 + 2; % States and parameters
+ny = 1;
+nu = 1;
 
 % Initialise
-x0 = [0; 0; 0.8];
+x0 = [0; 0; 0.8; 4.5];
+nx = length(x0);
 P0 = 0.1*eye(nx);
 u0 = 0;
 x_hat = x0;
@@ -93,12 +97,12 @@ function dx = msd_param(x,u)
     
     m = x(3); % Mass
     b = 0.01; % Damper coef
-    k = 5; % Coef of spring
+    k = x(4); % Coef of spring
 
-    dx = zeros(3,1); % Assign memory
+    nx = length(x);
+    dx = zeros(nx,1); % Assign memory
     dx(1,1) = x(2); % x_dot
     dx(2,1) = 1/m*(-k*x(1) - b*x(2) + u); % x_dotdot
-    dx(3,1) = 0; % Mass stays constant, dx = 0
 end
 
 function dx = nl_msd(x,u)
