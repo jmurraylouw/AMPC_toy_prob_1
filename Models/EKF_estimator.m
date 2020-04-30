@@ -12,7 +12,7 @@ t = out.x.Time';
 [nu, n_time] = size(u_data)
 
 % Initialise
-x0 = [0; 0; 0; 0; 1];
+x0 = [0; 0; 0; 1];
 P0 = 0.01*eye(nx);
 x_hat = x0;
 P = P0;

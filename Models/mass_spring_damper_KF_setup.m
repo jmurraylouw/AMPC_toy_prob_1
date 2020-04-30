@@ -18,8 +18,8 @@ sys_c = ss(A,B,C,D);  % Continuous system
 sys_d = c2d(sys_c, Ts); % Discrete system
 [F,G,H,D] = ssdata(sys_d);
 
-sigma_a = 0.01; % Std dev of acceleration/force applied to model
-Q = G*(sigma_a^2)*G';
+sigma_a = 0; % Std dev of acceleration/force applied to model
+Q = 0.00001*eye(nx);
 R = 0.01;
 
 % Initialise
