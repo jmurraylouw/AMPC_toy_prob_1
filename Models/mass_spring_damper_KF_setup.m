@@ -1,5 +1,4 @@
-clear all; close all;
-
+% Dimentions
 nx = 2;
 nu = 1;
 ny = 1;
@@ -15,7 +14,6 @@ C = [1, 0];
 D = 0;
 Ts = 0.01;
 
-sigma_a = 0; % Std dev of acceleration/force applied to model
 Q = 0.00001*eye(nx);
 R = 0.01;
 

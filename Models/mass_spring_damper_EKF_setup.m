@@ -4,17 +4,25 @@ nx = 2;
 nu = 1;
 ny = 1;
 
-% System definition
+% Linear msd system definition
 m = 1;
 b = 0.01;
 k = 5;
+
+A = [0, 1; -k/m, -b/m];
+B = [0; 1/m];
+C = [1, 0];
+D = 0;
+
+% Sample time of estimator
+Ts = 0.01;
 
 % Initialise
 x0 = [0; 0];
 P0 = [0, 0; 0, 0];
 u0 = 0;
 
-Q = 0.000001*eye(nx); % Model uncertainty
+Q = 0.00001*eye(nx); % Model uncertainty
 R = 0.01*eye(ny); % Measurement uncertainty
 
 % Function handles
