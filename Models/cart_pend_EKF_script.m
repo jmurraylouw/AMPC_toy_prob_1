@@ -1,5 +1,3 @@
-close all;
-
 % Read simulation data
 x_data = out.x.Data';
 y_data = out.y.Data';
