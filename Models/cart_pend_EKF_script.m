@@ -1,6 +1,6 @@
 % Applies Extended Kalman Filter for 
 % simueltaneous state and parameter estimation
-% on data from Mass spring damper simulation
+% on data from cart_pend
 
 % Read simulation data
 x_data = out.x.Data';
