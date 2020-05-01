@@ -17,7 +17,7 @@ P0 = 0.5*eye(nx);
 u0 = 0;
 
 Q = 0.00001*eye(nx); % Model uncertainty
-R = 0.0001*eye(ny); % Measurement uncertainty
+R = 0.001*eye(ny); % Measurement uncertainty
 
 % Function handles
 f = @cartpend; % Function handle
