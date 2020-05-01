@@ -13,20 +13,18 @@ Ts = t(2)-t(1);
 [nx, n_time] = size(x_data)
 [ny, n_time] = size(y_data)
 [nu, n_time] = size(u_data)
-ny = 1;
-nu = 1;
 
 % Initialise
-x0 = [0; 0; 0; 0.5];
+x0 = [0; 0; 0; 0.5; 2; 10; 10; 4];
 nx = length(x0);
-P0 = 0.1*eye(nx);
+P0 = 0.5*eye(nx);
 u0 = 0;
 x_hat = x0;
 P = P0;
 u = u0;
 
-Q = 0.0000001*eye(nx); % Model uncertainty
-R = 0.01*eye(ny); % Measurement uncertainty
+Q = 0.00001*eye(nx); % Model uncertainty
+R = 0.0001*eye(ny); % Measurement uncertainty
 
 % System definition
 m = 1;
@@ -86,14 +84,14 @@ for n = 1:1:n_time-1
     
 end
 
-plot_rows = [1 2 3];
+plot_rows = [1 3];
 figure
 plot(t, x_data(plot_rows,:)); 
 hold on
 plot(t, x_hat_data(plot_rows,:));
 % plot(t, y_data);
 hold off;
-legend('Actual x', 'Actual x_dot', 'Actual theta', 'Estimate x','Estimate x_dot', 'Estimate theta')
+legend('Actual x', 'Actual theta', 'Estimate x','Estimate theta')
 
 
 function dx = cartpend(x,u)
@@ -106,11 +104,11 @@ function dx = cartpend(x,u)
 %     m;]
 
 % Parameters
-m = 1;
-M = 5;
-L = 2;
+m = x(6); % 1
+M = x(8); % 5
+L = x(5); % 2
 g = -9.81;
-d = 10;
+d = x(7); % 10
 
 Sx = sin(x(3));
 Cx = cos(x(3));
@@ -127,7 +125,8 @@ end
 
 function y = measure(x,u)
 % Measurement function    
-y = x(1);
+y(1) = x(1);
+y(2) = x(3);
 end
 
 function J=jaccsd(f,x,u) % ??? Maybe should use simbolic diff for more exact
