@@ -55,6 +55,7 @@ sys_c = ss(A,B,C,D);
 sys_d = c2d(sys_c, Ts);
 [A,B,C,D] = ssdata(sys_d)
 
+% ??? Currently only uses last nx smaples for estimation
 O = obsv(A,C);
 if rank(O)~=nx
     error("ERROR. System not observable")
