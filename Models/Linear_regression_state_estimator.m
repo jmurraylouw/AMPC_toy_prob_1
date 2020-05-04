@@ -3,7 +3,40 @@
 % Derived from: Linear Systems with Sparse Inputs: Observability and Input Recovery
 % http://www.vision.jhu.edu/assets/SefatiACC15.pdf
 % x_N = A^N*pinv(O)*(Y_N - Gamma*U_N)
- 
+
+%% System definition
+% Double mass spring damper:
+nx = 4
+nu = 2;
+ny = 1;
+
+A = [0 1 0 0;
+    -5 -1 5 0;
+    0 0 0 1;
+    5 0 -5 -1]
+
+B = [0 0;
+    1 0;
+    0 0;
+    0 1;]
+
+C = [1 0 0 0]
+
+D = zeros(ny,nu)
+
+x0 = [0;0;0;0]
+
+%  Single mass spring damper
+% m = 1;
+% b = 0.5;
+% k = 5;
+% 
+% % Define continuous system
+% A= [0, 1; -k/m, -b/m];
+% B = [0; 1/m];
+% C = [1, 0];
+% D = 0;
+
 % Read simulation data
 u_data = out.u.Data';
 x_data = out.x.Data';
@@ -15,16 +48,6 @@ t = out.x.Time';
 [nu, n_time] = size(u_data);
 [ny, n_time] = size(y_data);
 
-% System parameters
-m = 1;
-b = 0.5;
-k = 5;
-
-% Define continuous system
-A= [0, 1; -k/m, -b/m];
-B = [0; 1/m];
-C = [1, 0];
-D = 0;
 Ts = t(2)-t(1);
 sys_c = ss(A,B,C,D);
 
@@ -59,6 +82,5 @@ for n = nx:1:n_time
 end
 
 plot(t,x_data); hold on
-pause
 plot(t,x_hat_data,'x'); hold off
 legend("x", "x_dot", "x_hat", "x_dot_hat")
