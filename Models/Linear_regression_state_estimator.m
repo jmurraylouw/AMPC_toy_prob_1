@@ -6,7 +6,7 @@
 
 %% System definition
 % Double mass spring damper:
-nx = 4
+nx = 4;
 nu = 2;
 ny = 1;
 
