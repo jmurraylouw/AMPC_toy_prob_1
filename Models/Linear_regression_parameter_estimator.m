@@ -53,6 +53,23 @@ for n = 3:1:n_time
     x_hat_data(1,n) = x*theta_hat;
 end
 
+% Compare to analtyical discrete model
+% 1/s^2 = Tz/(z-1)^2
+theta = [0;
+         (2*m+b-k*Ts)/(m+b);
+         -m/(m+b);
+         Ts/(m+b)] % From analytical derivation. Differential eq -> Laplace -> Z-transform -> Difference eq
+
+x_hat_data = zeros(n_time,2);
+% Initial condition
+x_hat_data(1,1) = 0; 
+x_hat_data(1,2) = 0;
+
+for n = 3:1:n_time
+    x = [1, x_hat_data(1,n-1), x_hat_data(1,n-2), u_data(n-1)];
+    x_hat_data(1,n) = x*theta;
+end
+
 plot(t,y_data)
 hold on;
 plot(t,x_hat_data(1,:), '--')
