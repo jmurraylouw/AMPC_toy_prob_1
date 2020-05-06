@@ -6,7 +6,7 @@ m = 1;
 b = 0.5;
 k = 5;
 
-%%
+
 % Read simulation data
 u_data = out.u.Data';
 x_data = out.x.Data';
@@ -23,7 +23,7 @@ A= [0, 1; -k/m, -b/m];
 B = [0; 1/m];
 C = [1, 0];
 D = 0;
-Ts = t(2)-t(1);
+T = t(2)-t(1);
 sys_c = ss(A,B,C,D);
 sys_d = c2d(sys_c, Ts);
 [F,G,H,D] = ssdata(sys_d);
@@ -53,30 +53,55 @@ for n = 3:1:n_time
     x_hat_data(1,n) = x*theta_hat;
 end
 
+figure
+plot(t,y_data)
+hold on;
+plot(t,x_hat_data(1,:), '--')
+plot(t,y_data-x_hat_data(1,:))
+hold off
+legend("Actual x", "Data Model x", "Error")
+title("Actual data vs data-driven model")
+
+% Mean squared Model error
+MSE_data = mean((y_data-x_hat_data(1,:)).^2)
+
 % Compare to analtyical discrete model
 % 1/s^2 = Tz/(z-1)^2
 theta = [0;
          (2*m+b-k*Ts)/(m+b);
          -m/(m+b);
-         Ts/(m+b)] % From analytical derivation. Differential eq -> Laplace -> Z-transform -> Difference eq
+         Ts/(m+b)]; % From analytical derivation. Differential eq -> Laplace -> Z-transform -> Difference eq
 
+% Tuskin model     
+theta = [0;
+     ((8*m) - (2*T^2*k))/(k*T^2 + 2*b*T + 4*m);
+     ((2*T*b)/(k*T^2 + 2*b*T + 4*m) - (4*m)/(k*T^2 + 2*b*T + 4*m) - (T^2*k)/(k*T^2 + 2*b*T + 4*m));
+     (T^2/(k*T^2 + 2*b*T + 4*m));
+     ((2*T^2)/(k*T^2 + 2*b*T + 4*m));
+     (T^2/(k*T^2 + 2*b*T + 4*m))]
+
+     
 x_hat_data = zeros(n_time,2);
 % Initial condition
 x_hat_data(1,1) = 0; 
 x_hat_data(1,2) = 0;
 
 for n = 3:1:n_time
-    x = [1, x_hat_data(1,n-1), x_hat_data(1,n-2), u_data(n-1)];
+    x = [1, x_hat_data(1,n-1), x_hat_data(1,n-2), u_data(n), u_data(n-1), u_data(n-2)];
     x_hat_data(1,n) = x*theta;
 end
 
+figure
 plot(t,y_data)
 hold on;
 plot(t,x_hat_data(1,:), '--')
+plot(t,y_data-x_hat_data(1,:))
 hold off
+legend("Actual x", "Analytic Model x", "Error")
+title("Actual data vs analytical model")
 
-
-
+% Mean squared Model error
+MSE_analytic = mean((y_data-x_hat_data(1,:)).^2)
 
 
 

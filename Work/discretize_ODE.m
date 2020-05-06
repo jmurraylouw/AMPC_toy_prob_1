@@ -1,4 +1,4 @@
-syms v(t) x(t) f(t) m b k T s z X_z F_z V_z n
+syms v(t) x(t) f(t) m b k T s z X_z F_z V_z n VAR
 
 % Define system as ODE
 Dx = diff(x,t);
@@ -23,9 +23,10 @@ Z_sys = simplifyFraction(Z_sys);
 % Flatten all fractions
 Z_sys = 0 == num_L*denom_R - num_R*denom_L;
 
+Z_sys = isolate(Z_sys, X_z*z^2);
 Z_sys = expand(Z_sys);
-Z_sys = collect(Z_sys, [F_z, X_z, z]);
+Z_sys = collect(Z_sys, [X_z, F_z, z]);
 
 pretty(Z_sys)
-
+Z_sys
 
