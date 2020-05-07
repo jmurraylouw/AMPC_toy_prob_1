@@ -4,15 +4,24 @@
 
 % ??? Why does anylital solution say x(n) is also dependant on u(n)
 
+disp("Least Squares Parameter Estimation")
+disp("----------------------------------")
+
+% Original paramters
 m = 1;
 b = 0.5;
 k = 5;
 
 % Read simulation data
-u_data = out.u.Data';
-x_data = out.x.Data';
-y_data = out.y.Data';
-t = out.x.Time';
+try
+    u_data = out.u.Data';
+    x_data = out.x.Data';
+    y_data = out.y.Data';
+    t = out.x.Time';
+catch
+    disp("No data to MSD read. Using saved data.")
+    load('mass_spring_damper_Square_wave_input_Measure_position.mat')
+end
 
 % Dimensions
 [nx, n_time] = size(x_data);
@@ -127,18 +136,21 @@ end
 
 % Solve overdetermined equations to get parameters
 % A*parameters = B
-A = Coef(:,2:end)
-B = -Coef(:,1)
+A = Coef(:,2:end);
+B = -Coef(:,1);
 parameters = A\B; % Least squares solution to overdetermined system
 m_hat = parameters(1)
 b_hat = parameters(2)
 k_hat = parameters(3)
 
+m = 1.1;
+b = 0.2;
+k = 3;
+
+
 m = 1;
 b = 0.5;
 k = 5;
-
-
 
 
 
