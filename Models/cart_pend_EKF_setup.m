@@ -9,14 +9,12 @@ f = @cartpend; % Function handle
 g = @measure; % Measurement function handle
 
 % Initialise
-% x = [x, x_dot, theta, theta_dot, L, m, d, M]
-x0 = [0; 0; 0; 0.5; 2; 10; 10; 4];
-P0 = 0.5*eye(nx);
-u0 = 0;
-
-% Dimensions
+% x = [x, x_dot, theta, theta_dot, L, m, d]
+x0 = [0; 0; 0; 0.5; 2; 10; 10];
 nx = length(x0); % 4 states, 3 paramters
 ny = length(g(x0)); % x and theta
+P0 = 0.5*eye(nx);
+u0 = 0;
 nu = length(u0);
 
 Q = 0.00001*eye(nx); % Model uncertainty
@@ -37,7 +35,7 @@ function dx = cartpend(x,u)
 
 % Parameters
 m = x(6); % 1 actual value
-M = x(8); % 5
+M = 5; % 5
 L = x(5); % 2
 g = -9.81;
 d = x(7); % 10

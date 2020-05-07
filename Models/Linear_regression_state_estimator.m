@@ -67,7 +67,7 @@ for index = 1:1:nx
                D; ...
                O(1:(nx-index)*ny, :)*B; ];
     
-    Gamma = [Gamma, new_col];
+    Gamma = [Gamma, new_col]; % Append to Gamma
 end
 
 x_hat_data = zeros(nx,n_time); % Assign memory

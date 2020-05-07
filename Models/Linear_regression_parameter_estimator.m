@@ -9,7 +9,7 @@ disp("----------------------------------")
 
 % Original paramters
 m = 1;
-b = 0.5;
+b = 0.01;
 k = 5;
 
 % Read simulation data
@@ -143,13 +143,9 @@ m_hat = parameters(1)
 b_hat = parameters(2)
 k_hat = parameters(3)
 
-m = 1.1;
-b = 0.2;
-k = 3;
-
-
+% Original paramters
 m = 1;
-b = 0.5;
+b = 0.01;
 k = 5;
 
 

@@ -1,6 +1,9 @@
 % Convert ODE of Mass-Spring_Damper system to Difference Equation
 % Can use different methods, like Tustin, Centred FD, Forward- or Backward Euler
 
+disp("discretize_ODE")
+disp("--------------")
+
 syms v(t) x(t) f(t) m b k T s z X_z F_z V_z n VAR
 
 % Define system as ODE

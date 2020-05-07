@@ -1,3 +1,4 @@
+% Setup workspace for EKF of mass spring damper
 
 % Dimensions
 nx = 2;
@@ -23,7 +24,7 @@ P0 = [0, 0; 0, 0];
 u0 = 0;
 
 Q = 0.00001*eye(nx); % Model uncertainty
-R = 0.01*eye(ny); % Measurement uncertainty
+R = 0.001*eye(ny); % Measurement uncertainty
 
 % Function handles
 f = @nl_msd; % System function handle
