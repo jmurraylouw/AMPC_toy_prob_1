@@ -31,14 +31,16 @@ sys_d = c2d(sys_c, T);
 
 % Assign memory
 N = n_time-2; % Number of measurements
-n_p = 4; % Number of Regressors (columns)
 z = zeros(N,1); % Measurement vector (z = y + v)
 X = zeros(N,n_p); % Regressors
 theta = zeros(n_p,1); % Parameter vector
 
 % Populate matrixes
 z = y_data(3:end)';
-X = [y_data(2:end-1)', y_data(1:end-2)', u_data(2:end-1)', u_data(1:end-2)'];
+X = [y_data(2:end-1)', y_data(1:end-2)', u_data(1:end-2)']; %, u_data(1:end-2)'
+
+n_p = size(X); 
+n_p = n_p(2); % Number of Regressors (columns)
 
 % Least squares
 theta_hat = inv(X'*X)*X'*z
@@ -49,7 +51,7 @@ x_hat_data(1,1) = 0;
 x_hat_data(1,2) = 0;
 
 for n = 3:1:n_time
-    x = [x_hat_data(1,n-1), x_hat_data(1,n-2), u_data(n-1), u_data(n-2)];
+    x = [x_hat_data(1,n-1), x_hat_data(1,n-2), u_data(n-2)]; %, u_data(n-2)
     x_hat_data(1,n) = x*theta_hat;
 end
 
@@ -67,20 +69,26 @@ MSE_data = mean((x_data(1,:)-x_hat_data(1,:)).^2)
 
 % Compare to analtyical discrete model
 % Tuskin model     
-theta = [...
+Tustin = [...
      ((8*m) - (2*T^2*k))/(k*T^2 + 2*b*T + 4*m);
      ((2*T*b)/(k*T^2 + 2*b*T + 4*m) - (4*m)/(k*T^2 + 2*b*T + 4*m) - (T^2*k)/(k*T^2 + 2*b*T + 4*m));
      
      ((2*T^2)/(k*T^2 + 2*b*T + 4*m));
      (2*T^2/(k*T^2 + 2*b*T + 4*m))]
-     
+
+% X_z*z^2 == (2 - (T*b)/m)*X_z*z + ((T*b)/m - (T^2*k)/m - 1)*X_z + (T^2/m)*F_z + T*x(0)*z + T^2*Dx(0) - T*x(0) + (T^2*b*x(0))/m
+Forward_Euler = [...
+    (2 - (T*b)/m);
+    ((T*b)/m - (T^2*k)/m - 1);
+    (T^2/m)]
+ 
 x_hat_data = zeros(n_time,2);
 % Initial condition
 x_hat_data(1,1) = 0; 
 x_hat_data(1,2) = 0;
 
 for n = 3:1:n_time
-    x = [x_hat_data(1,n-1), x_hat_data(1,n-2), u_data(n-1), u_data(n-2)];
+    x = [x_hat_data(1,n-1), x_hat_data(1,n-2), u_data(n-2)];
     x_hat_data(1,n) = x*theta;
 end
 
@@ -95,23 +103,28 @@ title("Actual data vs analytical model")
 
 % Mean squared Model error
 MSE_analytic = mean((x_data(1,:)-x_hat_data(1,:)).^2)
-
+%%
 % Solve for parameters
 syms m k b
-eqn_theta = [...
-     ((8*m) - (2*T^2*k))/(k*T^2 + 2*b*T + 4*m);
-     ((2*T*b - (4*m) - (T^2*k))/(k*T^2 + 2*b*T + 4*m));
-     
-     ((2*T^2)/(k*T^2 + 2*b*T + 4*m));
-     (2*T^2/(k*T^2 + 2*b*T + 4*m))] ...
-     == theta_hat;
+% eqn_theta = [...
+%      ((8*m) - (2*T^2*k))/(k*T^2 + 2*b*T + 4*m);
+%      ((2*T*b - (4*m) - (T^2*k))/(k*T^2 + 2*b*T + 4*m));
+%      
+%      ((2*T^2)/(k*T^2 + 2*b*T + 4*m));
+%      (2*T^2/(k*T^2 + 2*b*T + 4*m))] ...
+%      == theta_hat;
 
+eqn_theta = [...
+    (2 - (T*b)/m);
+    ((T*b)/m - (T^2*k)/m - 1);
+    (T^2/m)] == theta_hat;
+ 
 [num_L, denom_L] = numden(lhs(eqn_theta)); % extract left numerator and denomenator
 [num_R, denom_R] = numden(rhs(eqn_theta));
 % Flatten all fractions
 eqn_theta = 0 == num_L.*denom_R - num_R.*denom_L;
 
-Coef = zeros(n_p, 4);
+Coef = zeros(n_p, 3);
 
 old = [1 m b k];
 new = [1 2 3 4]; % Index where each symbol should be
