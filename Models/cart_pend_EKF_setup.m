@@ -4,24 +4,24 @@
 
 Ts = 0.01;
 
-% Dimensions
-nx = 4 + 3; % 4 states, 3 paramters
-ny = 2; % x and theta
-nu = 1;
+% Function handles
+f = @cartpend; % Function handle
+g = @measure; % Measurement function handle
 
 % Initialise
 % x = [x, x_dot, theta, theta_dot, L, m, d, M]
 x0 = [0; 0; 0; 0.5; 2; 10; 10; 4];
-nx = length(x0);
 P0 = 0.5*eye(nx);
 u0 = 0;
+
+% Dimensions
+nx = length(x0); % 4 states, 3 paramters
+ny = length(g(x0)); % x and theta
+nu = length(u0);
 
 Q = 0.00001*eye(nx); % Model uncertainty
 R = 0.001*eye(ny); % Measurement uncertainty
 
-% Function handles
-f = @cartpend; % Function handle
-g = @measure; % Measurement function handle
 
 function dx = cartpend(x,u)
 % Adapted from code by Steve Brunton
@@ -30,10 +30,13 @@ function dx = cartpend(x,u)
 %     x_dot;
 %     theta;
 %     theta_dot;
-%     m;]
+%     L;
+%     m;
+%     d;
+%     M;]
 
 % Parameters
-m = x(6); % 1
+m = x(6); % 1 actual value
 M = x(8); % 5
 L = x(5); % 2
 g = -9.81;
@@ -56,9 +59,11 @@ function y = measure(x,u)
 % Measurement function    
 y(1) = x(1);
 y(2) = x(3);
+
+y(3) = x(2);
 end
 
-function J=jaccsd(f,x,u) % ??? Maybe should use simbolic diff for more exact
+function J = jaccsd(f,x,u) % ??? Maybe should use simbolic diff for more exact
 % JACCSD Jacobian through complex step differentiation
 % By Yi Cao at Cranfield University, 02/01/2008
 % [z J] = jaccsd(f,x)
