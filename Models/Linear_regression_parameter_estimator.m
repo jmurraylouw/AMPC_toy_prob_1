@@ -2,10 +2,11 @@
 % Try use Last squares to find parameters of mass spring damper
 % Based on: Pietersen, System Identification for Fault Tolerant Control of Unmanned Aerial Vehicles
 
+% ??? Why does anylital solution say x(n) is also dependant on u(n)
+
 m = 1;
 b = 0.5;
 k = 5;
-
 
 % Read simulation data
 u_data = out.u.Data';
@@ -19,18 +20,18 @@ t = out.x.Time';
 [ny, n_time] = size(y_data);
 
 % State space system
-A= [0, 1; -k/m, -b/m];
+A = [0, 1; -k/m, -b/m];
 B = [0; 1/m];
 C = [1, 0];
 D = 0;
 T = t(2)-t(1);
 sys_c = ss(A,B,C,D);
-sys_d = c2d(sys_c, Ts);
+sys_d = c2d(sys_c, T);
 [F,G,H,D] = ssdata(sys_d);
 
 % Assign memory
 N = n_time-2; % Number of measurements
-n_p = 4; % Number of parameters
+n_p = 4; % Number of Regressors (columns)
 z = zeros(N,1); % Measurement vector (z = y + v)
 X = zeros(N,n_p); % Regressors
 theta = zeros(n_p,1); % Parameter vector
@@ -38,7 +39,6 @@ theta = zeros(n_p,1); % Parameter vector
 % Populate matrixes
 z = y_data(3:end)';
 X = [y_data(2:end-1)', y_data(1:end-2)', u_data(2:end-1)', u_data(1:end-2)'];
-
 
 % Least squares
 theta_hat = inv(X'*X)*X'*z
@@ -54,16 +54,16 @@ for n = 3:1:n_time
 end
 
 figure
-plot(t,y_data)
+plot(t,x_data(1,:))
 hold on;
 plot(t,x_hat_data(1,:), '--')
-plot(t,y_data-x_hat_data(1,:))
+plot(t,x_data(1,:)-x_hat_data(1,:))
 hold off
 legend("Actual x", "Data Model x", "Error")
 title("Actual data vs data-driven model")
 
 % Mean squared Model error
-MSE_data = mean((y_data-x_hat_data(1,:)).^2)
+MSE_data = mean((x_data(1,:)-x_hat_data(1,:)).^2)
 
 % Compare to analtyical discrete model
 % Tuskin model     
@@ -71,9 +71,8 @@ theta = [...
      ((8*m) - (2*T^2*k))/(k*T^2 + 2*b*T + 4*m);
      ((2*T*b)/(k*T^2 + 2*b*T + 4*m) - (4*m)/(k*T^2 + 2*b*T + 4*m) - (T^2*k)/(k*T^2 + 2*b*T + 4*m));
      
-     ((3*T^2)/(k*T^2 + 2*b*T + 4*m));
-     (T^2/(k*T^2 + 2*b*T + 4*m))]
-% Coeff of f(n) was = (T^2/(k*T^2 + 2*b*T + 4*m)). now added to f(n-1)
+     ((2*T^2)/(k*T^2 + 2*b*T + 4*m));
+     (2*T^2/(k*T^2 + 2*b*T + 4*m))]
      
 x_hat_data = zeros(n_time,2);
 % Initial condition
@@ -86,47 +85,63 @@ for n = 3:1:n_time
 end
 
 figure
-plot(t,y_data)
+plot(t,x_data(1,:))
 hold on;
 plot(t,x_hat_data(1,:), '--')
-plot(t,y_data-x_hat_data(1,:))
+plot(t,x_data(1,:)-x_hat_data(1,:))
 hold off
 legend("Actual x", "Analytic Model x", "Error")
 title("Actual data vs analytical model")
 
 % Mean squared Model error
-MSE_analytic = mean((y_data-x_hat_data(1,:)).^2)
+MSE_analytic = mean((x_data(1,:)-x_hat_data(1,:)).^2)
 
-%% Solve for parameters
+% Solve for parameters
 syms m k b
 eqn_theta = [...
      ((8*m) - (2*T^2*k))/(k*T^2 + 2*b*T + 4*m);
      ((2*T*b - (4*m) - (T^2*k))/(k*T^2 + 2*b*T + 4*m));
-     ((3*T^2)/(k*T^2 + 2*b*T + 4*m));
-     (T^2/(k*T^2 + 2*b*T + 4*m))] ...
-     == theta
+     
+     ((2*T^2)/(k*T^2 + 2*b*T + 4*m));
+     (2*T^2/(k*T^2 + 2*b*T + 4*m))] ...
+     == theta_hat;
 
 [num_L, denom_L] = numden(lhs(eqn_theta)); % extract left numerator and denomenator
 [num_R, denom_R] = numden(rhs(eqn_theta));
 % Flatten all fractions
-eqn_theta = 0 == num_L.*denom_R - num_R.*denom_L
-r = eqn_theta(1)
-Coef = zeros(n_p, 4)
+eqn_theta = 0 == num_L.*denom_R - num_R.*denom_L;
 
-[coef,term] = coeffs(rhs(r))
+Coef = zeros(n_p, 4);
+
 old = [1 m b k];
 new = [1 2 3 4]; % Index where each symbol should be
-term_indexes = subs(term, old, new)
+term_indexes = subs(term, old, new);
 for row = 1:1:n_p
-    [coef,term] = coeffs(rhs(eqn_theta(row)))
-    term_indexes = subs(term, old, new)
+    [coef,term] = coeffs(rhs(eqn_theta(row)));
+    term_indexes = subs(term, old, new);
     for index = 1:1:length(term_indexes)
         col = term_indexes(index);
         Coef(row,col) =  coef(index);
     end
 end
 
-Coef
-eqn_theta
+% Solve overdetermined equations to get parameters
+% A*parameters = B
+A = Coef(:,2:end)
+B = -Coef(:,1)
+parameters = A\B; % Least squares solution to overdetermined system
+m_hat = parameters(1)
+b_hat = parameters(2)
+k_hat = parameters(3)
 
-% Now solve for equations
+m = 1;
+b = 0.5;
+k = 5;
+
+
+
+
+
+
+
+
