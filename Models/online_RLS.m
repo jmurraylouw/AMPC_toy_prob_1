@@ -11,7 +11,7 @@ N            = max(size(x_data)); % Number of time steps
 eps_data     = zeros(1,N); % Error between predicted and actual output
 x_hat_data   = zeros(1,N); % Predicted output
 
-M = 5; % Number of parameters in Theta
+M = 3 + 2 + 3; % Number of parameters in Theta (u,x,eps)
 
 % Initialise
 lambda  = 0.999;         % forgetting factor
@@ -41,7 +41,7 @@ for n = 1:1:N
 
     P       = reshape(P2, M, M); % Reshape vector P2 in matrix P
     
-    % phi = [u(n); u(n-1); u(n-2); x(n-1); x(n-2)]
+    % phi = [u(n); u(n-1); u(n-2); x(n-1); x(n-2); eps(n-1); eps(n-2)]
     % Theta = row vector of parameters
     % x(n) = Theta*phi    
     
@@ -49,17 +49,17 @@ for n = 1:1:N
     pi      = phi'*P; % phi(n)'*P(n-1)
     gamma   = lambda + pi*phi; % lambda + phi(n)'*P(n-1)*phi(n)
     K       = pi'/gamma; % phi(n)'*P(n-1) * inv(lambda + phi(n)'*P(n-1)*phi(n))
-    x_hat   = Theta'*phi;
-    eps     = x - x_hat;
-    Theta   = Theta + K*eps; % Estimate next parameter vector
+    x_hat   = Theta'*phi; % Theta(n-1)'*phi(n)
+    eps     = x - x_hat; % eps(n) = x(n) - Theta(n-1)'*phi(n)
+    Theta   = Theta + K*eps; % Theta(n), Estimate next parameter vector
 
     P_prime = K*pi;
     P       = 1/lambda*(P - P_prime); % P(n), Update P for next use
     P2      = reshape(P, M*M, 1); % Form a vector to store in Dwork   
     
-    % Currently: prev_data = [u(n-1); u(n-2); x(n-1); x(n-2)]
-    % Needs to be for next step: prev_data = [u(n); u(n-1); x(n); x(n-1)]
-    prev_data   = [u; prev_data(1); x; prev_data(3)]; % Will be used for phi
+    % Currently: prev_data = [u(n-1); u(n-2); x(n-1); x(n-2); eps(n-1); eps(n-2)]
+    % Needs to be for next step: prev_data = [u(n); u(n-1); x(n); x(n-1); eps(n); eps(n-1);]
+    prev_data   = [u; prev_data(1); x; prev_data(3); eps; prev_data(5); prev_data(6)]; % Will be used for phi
     
     eps_data(n) = eps;
     Theta_data(:,n) = Theta;
@@ -71,12 +71,14 @@ end
 
 
 % Plot model
-x_hat_data = zeros(1,N)
+x_hat_data = zeros(1,N);
 x_hat_data(1) = 0; % Initial condition
+phi = zeros(M,1);
 
 for n = 3:1:N
+%     eps = x_hat_data(n-1) - Theta'*phi; % eps(n-1)
     phi = [u_data(n); u_data(n-1); u_data(n-2); x_hat_data(n-1); x_hat_data(n-2)];
-    x_hat_data(n) = Theta'*phi;
+    x_hat_data(n) = Theta(1:end-3)'*phi;
 end
 
 eps_data = x_data(1,:) - x_hat_data;
@@ -88,11 +90,12 @@ plot(t,eps_data, 'k');
 % plot(t,y_data)
 hold off
 
+Theta
+MSE = mean((eps_data).^2) % Mean Squared Error
+
 legend('x_hat', 'x actual', 'error (eps)', 'measured')
 title(strcat('l = ', num2str(lambda), '; noise ps = ', int2str(M-4), '; err ave = ', num2str(MSE)))
 
-Theta
-MSE = mean((eps_data).^2) % Mean Squared Error
 
 
 disp("END")
