@@ -3,7 +3,7 @@
 % Full state feedback
 
 %% Variables for simulation
-x0 = [5; 0];
+x0 = [0; 0];
 m = 1;
 b = 0.1;
 k = 5;

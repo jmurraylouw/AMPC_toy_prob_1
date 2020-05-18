@@ -1,4 +1,4 @@
-%% Investigate DMD with partial state feedback
+%% Investigate DMD with partial state feedback for mass spring damper
 % Key words:
 % Time delay embedding
 % Hankel matrix

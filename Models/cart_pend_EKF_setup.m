@@ -10,14 +10,14 @@ g = @measure; % Measurement function handle
 
 % Initialise
 % x = [x, x_dot, theta, theta_dot, L, m, d]
-x0 = [0; 0; 0; 0.5; 2; 10; 10];
+x0 = [0; 0; 0; 0];
 nx = length(x0); % 4 states, 3 paramters
 ny = length(g(x0)); % x and theta
 P0 = 0.5*eye(nx);
 u0 = 0;
 nu = length(u0);
 
-Q = 0.00001*eye(nx); % Model uncertainty
+Q = diag([0; 0; 0.00001; 0.0000001]); % Model uncertainty
 R = 0.001*eye(ny); % Measurement uncertainty
 
 
@@ -34,11 +34,11 @@ function dx = cartpend(x,u)
 %     M;]
 
 % Parameters
-m = x(6); % 1 actual value
+m = 1;% x(6); % 1 actual value
 M = 5; % 5
-L = x(5); % 2
+L = 2;% x(5); % 2
 g = -9.81;
-d = x(7); % 10
+d = 10; % x(7); % 10
 
 Sx = sin(x(3));
 Cx = cos(x(3));
@@ -56,9 +56,8 @@ end
 function y = measure(x,u)
 % Measurement function    
 y(1) = x(1);
-y(2) = x(3);
 
-y(3) = x(2);
+
 end
 
 function J = jaccsd(f,x,u) % ??? Maybe should use simbolic diff for more exact
