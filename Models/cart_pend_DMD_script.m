@@ -1,7 +1,8 @@
 %% DMD - Moving-Window of cart pendulum
 % Estimate System matrixes with moving window of data in real time
 % Full state feedback
-
+x0 = [0; 0; 0; 0];
+%%
 u_data  = out.u.Data';
 x_data  = out.x.Data';
 t       = out.tout';
