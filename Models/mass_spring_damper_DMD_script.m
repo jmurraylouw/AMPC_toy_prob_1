@@ -47,7 +47,7 @@ MSE_dmd = mean(((x_data-x_hat_data).^2)')'
 % Augment y with time delay coordinates of y
 
 samples = 1000;
-delays = 5; % Number of delay cordinates, including y_data(1:samples+1)
+delays = 3; % Number of delay cordinates, including y_data(1:samples+1)
 tau = 1; % Sample number shift of delay cordinates. 
 % i.e Y = y(k)      y(k+1)      y(k+2)...
 %         y(k+tau)  y(k+tau+1)  y(k+tau+2)...
@@ -55,16 +55,19 @@ tau = 1; % Sample number shift of delay cordinates.
 assert(samples+delays*tau <= N); %% otherwise index out of bounds 
 
 % Step 1: Collect and construct the snapshot matrices:
-Y = [];
+X = []; % Augmented state with delay coordinates [Y(k); Y(k-1*tau); Y(k-2*tau); ...]
 for i = 1:tau:delays*tau
-    Y = [Y; y_data(:, i:samples+i)];
+    X = [y_data(:, i:samples+i); X];  
 end
 
-Y2 = Y(:, 2:end); % Y advanced 1 step into future
-Y = Y(:, 1:end-1); % Cut off last sample
-Upsilon = u_data(:, 1:samples); % Upsilon
+n = size(X)*[1; 0]; % Length of augmented state vector
 
-Omega = [Y; Upsilon]; % Omega is concatination of Y and Upsilon
+X2 = X(:, 2:end); % Y advanced 1 step into future
+X = X(:, 1:end-1); % Cut off last sample
+
+Upsilon = u_data(:, (delays*tau):(samples + delays*tau - 1)); % Upsilon
+
+Omega = [X; Upsilon]; % Omega is concatination of Y and Upsilon
 
 % Step 2: Compute and truncate the SVD of the input space Omega
 [U,S,V] = svd(Omega, 'econ');
@@ -72,30 +75,52 @@ Omega = [Y; Upsilon]; % Omega is concatination of Y and Upsilon
 p = 3; % Reduced rank of Omega svd
 U_tilde = U(:, 1:p); % Truncate SVD matrixes of Omega
 S_tilde = S(1:p, 1:p);
-V_tilde = V(1:p, 1);
+V_tilde = V(:, 1:p);
+U1_tilde = U_tilde(1:n, :);
+U2_tilde = U_tilde(n+1:end, :);
 
-[U,S,V] = svd(Y2, 'econ');
+
+% Step 3: Compute the SVD of the output space Y'
+[U,S,V] = svd(X2, 'econ');
 % plot(diag(S), 'o')
-r = 2; % Reduced rank of X2 svd
+r = 2; % Reduced rank of X2 svd, r < p
 U_hat = U(:, 1:r); % Truncate SVD matrixes of X2
 S_hat = S(1:r, 1:r);
-V_hat = V(1:r, 1);
+V_hat = V(:, 1:r);
 
+% Step 4: Compute the approximation of the operators G = [A B]
+A_tilde = U_hat'*X2*V_tilde*inv(S_tilde)*U1_tilde'*U_hat;
+B_tilde = U_hat'*X2*V_tilde*inv(S_tilde)*U2_tilde';
 
+% x_tilde(k+1) = A_tilde*x_tilde(k) + B_tilde*u(k)
+% x = U_hat*x_tilde, Transform to original coordinates
+% x_tilde = U_hat'*x, Transform to reduced order coordinates
+% Here x is augmented state
 
+% Ignore eigenmodes Step 5 and 6
 
-%%
+% Run model
 x_hat_0 = [];
 for i = 1:tau:delays*tau
-    x_hat_0 = [x_hat_0; y_data(:,i)];
+    x_hat_0 = [y_data(:,i); x_hat_0];
 end
 
-x_hat_data = plot_model(A,B,u_data,t,x_hat_0);
-hold on;
-plot(t, x_data, '--')
-hold on;
+x_tilde_0 = U_hat'*x_hat_0;
 
-MSE_dmd = mean(((x_data-x_hat_data).^2)')'
+t_cut = t(delays*tau:end); % Cut off first part to match model
+y_data_cut = y_data(:,delays*tau:end);
+
+x_tilde_hat = run_model(A_tilde,B_tilde,u_data,t_cut,x_tilde_0);
+x_hat = U_hat*x_tilde_hat; % COnvert back to original coordinate system
+
+plot(t_cut, y_data_cut)
+hold on;
+plot(t_cut, x_hat(1,:), '--');
+hold off;
+
+delays
+tau
+MSE_dmdc = mean(((y_data_cut - x_hat(1,:)).^2)')'
 
 %% Analytic system
 
@@ -200,7 +225,7 @@ ny = size_C(1);
 
 % Create nominal point at all 0, because linear model.
 X = zeros(nx,1);
-Y = zeros(ny,1);
+X = zeros(ny,1);
 Upsilon = zeros(nu,1);
 DX = [0; 0];
 
@@ -215,7 +240,14 @@ function X_hat = plot_model(A,B,U_data,t,x0)
     plot(t, X_hat);     % Estimated x
 end
 
-
+function X_hat = run_model(A,B,U_data,t,x0)
+    N = max(size(t));   % Number of time steps 
+    X_hat = zeros(length(x0),N); % Estimated X from model
+    X_hat(:,1) = x0; % Initial conditions
+    for index = 1:1:N-1
+        X_hat(:,index+1) = A*X_hat(:,index) + B*U_data(index);
+    end
+end
 
 
 
