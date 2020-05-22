@@ -1,6 +1,6 @@
 %% DMD - Moving-Window of mass spring damper
 % Estimate System matrixes with moving window of data in real time
-% Full state feedback
+% Partial state feedback
 
 %% Variables for simulation
 x0 = [0; 0];
@@ -8,13 +8,14 @@ m = 1;
 b = 0.1;
 k = 5;
 
-
 %% Read data
-u_data  = out.u.Data';
-x_data  = out.x.Data';
-y_data  = [1 0]*out.x.Data';
-% y_data  = out.y.Data';
-t       = out.tout';
+% u_data  = out.u.Data';
+% x_data  = out.x.Data';
+% y_data  = [1 0]*out.x.Data';
+% % y_data  = out.y.Data';
+% t       = out.tout';
+
+load('C:\Users\Murray\OneDrive - Stellenbosch University\Masters\AMPC_toy_prob_1\Data\mass_spring_damper_Square_wave_input_Measure_position.mat')
 
 nx = size(x_data)*[1; 0];
 ny = size(y_data)*[1; 0];
@@ -25,30 +26,31 @@ Ts      = t(2)-t(1);     % Sample time of data
 w       = 100;    % Size of window in timesteps
 
 
-%% Batch DMD - Full state feedback, no truncation
-X = x_data(:, 1:end-1);
-X2 = x_data(:, 2:end);
-Upsilon = u_data(:, 1:end-1); % Upsilon
-% X2 = A*X + B*U
-% X2 = [A, B]*[X; U]
-
-G = X2/[X; Upsilon];
-A = G(:, 1:nx);
-B = G(:, nx+1:end);
-
-x_hat_data = plot_model(A,B,u_data,t,x0);
-hold on;
-plot(t, x_data, '--')
-hold on;
-
-MSE_dmd = mean(((x_data-x_hat_data).^2)')'
+% %% Batch DMD - Full state feedback, no truncation
+% X = x_data(:, 1:end-1);
+% X2 = x_data(:, 2:end);
+% Upsilon = u_data(:, 1:end-1); % Upsilon
+% % X2 = A*X + B*U
+% % X2 = [A, B]*[X; U]
+% 
+% G = X2/[X; Upsilon];
+% A = G(:, 1:nx);
+% B = G(:, nx+1:end);
+% 
+% x_hat_data = plot_model(A,B,u_data,t,x0);
+% hold on;
+% plot(t, x_data, '--')
+% hold on;
+% 
+% MSE_dmd = mean(((x_data-x_hat_data).^2)')'
 
 %% Batch DMDc - Partial state feedback
 % Augment y with time delay coordinates of y
 
 samples = 1000;
 delays = 3; % Number of delay cordinates, including y_data(1:samples+1)
-tau = 1; % Sample number shift of delay cordinates. 
+tau = 1; % Sample number shift of delay cordinates.
+% Noticed error increased for increasing tau
 % i.e Y = y(k)      y(k+1)      y(k+2)...
 %         y(k+tau)  y(k+tau+1)  y(k+tau+2)...
 
@@ -71,19 +73,20 @@ Omega = [X; Upsilon]; % Omega is concatination of Y and Upsilon
 
 % Step 2: Compute and truncate the SVD of the input space Omega
 [U,S,V] = svd(Omega, 'econ');
+
 % plot(diag(S), 'o')
-p = 3; % Reduced rank of Omega svd
+p = size(V)*[0; 1]; % Reduced rank of Omega svd
 U_tilde = U(:, 1:p); % Truncate SVD matrixes of Omega
 S_tilde = S(1:p, 1:p);
 V_tilde = V(:, 1:p);
 U1_tilde = U_tilde(1:n, :);
 U2_tilde = U_tilde(n+1:end, :);
 
-
-% Step 3: Compute the SVD of the output space Y'
+% Step 3: Compute the SVD of the output space X'
 [U,S,V] = svd(X2, 'econ');
+
 % plot(diag(S), 'o')
-r = 2; % Reduced rank of X2 svd, r < p
+r = p-1; % Reduced rank of X2 svd, r < p
 U_hat = U(:, 1:r); % Truncate SVD matrixes of X2
 S_hat = S(1:r, 1:r);
 V_hat = V(:, 1:r);
@@ -97,6 +100,15 @@ B_tilde = U_hat'*X2*V_tilde*inv(S_tilde)*U2_tilde';
 % x_tilde = U_hat'*x, Transform to reduced order coordinates
 % Here x is augmented state
 
+A = U_hat*A_tilde*U_hat'
+B = U_hat*B_tilde
+
+% Manually Add row for x_dot, with Centred Euler differentiation
+x_dot_row = 1/(2*Ts)*[1 0 0]*(A^2-eye(3));
+A = [x_dot_row; A];
+A = [zeros(4,1), A]; % Add column of zeros, nothing depends on x_dot
+B = [0; B]; % Add zero. Force does not affect x_dot in model
+
 % Ignore eigenmodes Step 5 and 6
 
 % Run model
@@ -104,23 +116,28 @@ x_hat_0 = [];
 for i = 1:tau:delays*tau
     x_hat_0 = [y_data(:,i); x_hat_0];
 end
-
-x_tilde_0 = U_hat'*x_hat_0;
+x_hat_0 = [x_data(2,delays*tau); x_hat_0];
 
 t_cut = t(delays*tau:end); % Cut off first part to match model
-y_data_cut = y_data(:,delays*tau:end);
+x_data_cut = x_data(:,delays*tau:end);
 
-x_tilde_hat = run_model(A_tilde,B_tilde,u_data,t_cut,x_tilde_0);
-x_hat = U_hat*x_tilde_hat; % COnvert back to original coordinate system
+% x_tilde_0 = U_hat'*x_hat_0; % Convert to tilde coordinate system
+% x_tilde_hat = run_model(A_tilde,B_tilde,u_data,t_cut,x_tilde_0);
+% x_hat = U_hat*x_tilde_hat; % Convert back to original coordinate system
 
-plot(t_cut, y_data_cut)
+x_hat = run_model(A,B,u_data,t_cut,x_hat_0);
+
+plot(t_cut, x_data_cut)
+pause
 hold on;
-plot(t_cut, x_hat(1,:), '--');
+plot(t_cut, x_hat(1:2,:), '--');
 hold off;
 
 delays
 tau
-MSE_dmdc = mean(((y_data_cut - x_hat(1,:)).^2)')'
+MSE_dmdc = mean(((x_data_cut(1,:) - x_hat(1,:)).^2)')'
+%%
+stop
 
 %% Analytic system
 
