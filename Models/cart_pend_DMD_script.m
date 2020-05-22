@@ -27,7 +27,7 @@ Ts      = t(2)-t(1);     % Sample time of data
 %% Batch DMDc - Partial state feedback
 % Augment y with time delay coordinates of y
 
-samples = 2000;
+samples = 20/Ts;
 delays = 2; % Number of delay cordinates, including y_data(1:samples+1)
 tau = 1; % Sample number shift of delay cordinates.
 % Noticed error increased for increasing tau
