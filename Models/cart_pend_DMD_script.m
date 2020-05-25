@@ -10,9 +10,19 @@ u_data  = out.u.Data';
 x_data  = out.x.Data';
 I = eye(4);
 y_data  = I([1, 3],:)*out.x.Data'; % Measure x and theta
-% [1 0 0 0; 0 0 1 0]
+
 % y_data  = out.y.Data';
 t       = out.tout';
+
+Ts      = t(2)-t(1);     % Sample time of data
+
+% Cut out transient time period
+u_data = u_data(:, 10/Ts:end);
+x_data = x_data(:, 10/Ts:end);
+y_data = y_data(:, 10/Ts:end);
+t      = t(:, 10/Ts:end);
+
+N       = max(size(x_data)); % Number of data samples
 
 % Load saved data from memory
 % load('C:\Users\Murray\OneDrive - Stellenbosch University\Masters\AMPC_toy_prob_1\Data\cart_pend_square_wave_response.mat')
@@ -21,14 +31,14 @@ n = size(x_data)*[1; 0]; % number of states
 m = size(y_data)*[1; 0]; % number of measurements
 l = size(u_data)*[1; 0]; % number of inputs
 
-N       = max(size(x_data)); % Number of data samples
-Ts      = t(2)-t(1);     % Sample time of data
 
 %% Batch DMDc - Partial state feedback
 % Augment y with time delay coordinates of y
 
-samples = 20/Ts;
-delays = 2; % Number of delay cordinates, including y_data(1:samples+1)
+% Very dependant on choice of delays, p, r
+
+samples = 30/Ts;
+delays = 10; % Number of delay cordinates, including y_data(1:samples+1)
 tau = 1; % Sample number shift of delay cordinates.
 % Noticed error increased for increasing tau
 % i.e Y = y(k)      y(k+1)      y(k+2)...
@@ -56,7 +66,8 @@ Omega = [X; Upsilon]; % Omega is concatination of Y and Upsilon
 % figure(1), plot(diag(S))
 
 % plot(diag(S), 'o')
-p = min(size(V)); % Reduced rank of Omega svd
+p = min(size(V)) % Reduced rank of Omega svd
+p=9
 U_tilde = U(:, 1:p); % Truncate SVD matrixes of Omega
 S_tilde = S(1:p, 1:p);
 V_tilde = V(:, 1:p);
@@ -69,6 +80,7 @@ U2_tilde = U_tilde(n+1:end, :);
 
 % plot(diag(S), 'o')
 r = min(size(V)); % Reduced rank of X2 svd, r < p
+r=p-1
 U_hat = U(:, 1:r); % Truncate SVD matrixes of X2
 S_hat = S(1:r, 1:r);
 V_hat = V(:, 1:r);
@@ -111,14 +123,17 @@ x_data_cut = x_data(:,delays*tau:end);
 
 x_hat = run_model(A,B,u_data,t_cut,x_hat_0);
 
-figure(3), plot(t_cut, x_hat(1:3,:), '--');
+figure(3), plot(t_cut, x_hat([1, 2],:), '--');
 hold on;
-plot(t_cut, x_data_cut([1:3],:))
+plot(t_cut, x_data_cut([1, 3],:))
 hold off;
+
+figure(4), plot(t_cut, x_data_cut([1, 3],:)-x_hat([1, 2],:), '--');
 
 delays
 tau
 MSE_dmdc = mean(((x_data_cut(1,:) - x_hat(1,:)).^2)')'
+
 %%
 stop
 
