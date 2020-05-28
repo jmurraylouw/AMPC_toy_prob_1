@@ -45,5 +45,5 @@ if(polyorder>=3)
 end
 
 assert(index-2 == rows, 'There are %d rows in Xi, but only %d combinations of terms',rows,index-2 )
-vis_Xi
+
 
