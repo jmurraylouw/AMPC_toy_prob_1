@@ -19,18 +19,21 @@ M=1;m=1;L=1;g=9.81;
 noise=0.02;
 
 % Define whehter you have control, if you have it, please define it
-Control=1;
+Control=0;
 
 %Define whether you want to shuffel the final data
 Shuffle=0;
 
 % Peform simulation
-state0=[0.3;0;1;0]; state0_test=[0.1;0;0.3;0];
-dt=0.001; T=16; T_test=2;
-tspan=0:dt:T; tspan_test=0:dt:T_test;
+state0=[0.3;0;1;0];state0_test=[0.1;0;0.3;0];
+dt=0.001;T=16;T_test=2;
+tspan=0:dt:T;tspan_test=0:dt:T_test;
 u=-0.2+0.5*sin(6*(tspan'));
 u_test=-1+1*sin((tspan_test'))+3*sin(2*(tspan_test'));
-[dData,Data]=Get_Sim_Data(@(t,y,u)SinglePendulum_ODE(t,y,u,M,m,L,g),state0,u,tspan,noise,Control,Shuffle);
+% [dData,Data]=Get_Sim_Data(@(t,y,u)SinglePendulum_ODE(t,y,u,M,m,L,g),state0,u,tspan,noise,Control,Shuffle);
+
+[t,Data]=ode45(@(t,y) SinglePendulum_ODE(t,y,0,M,m,L,g),tspan,state0);
+stop
 dData(:,1)=Data(:,3);dData(:,2)=Data(:,4);
 [dData_test,Data_test]=Get_Sim_Data(@(t,y,u)SinglePendulum_ODE(t,y,u,M,m,L,g),state0_test,u_test,tspan_test,noise,Control,Shuffle);
 dData_test(:,1)=Data_test(:,3);dData_test(:,2)=Data_test(:,4);

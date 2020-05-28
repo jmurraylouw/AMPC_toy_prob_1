@@ -10,11 +10,11 @@ Xi = Theta\dXdt;  % initial guess: Least-squares
 
 % lambda is our sparsification knob.
 for k=1:10
-    smallinds = (abs(Xi)<lambda);   % find small coefficients
-    Xi(smallinds)=0;                % and threshold
-    for ind = 1:n                   % n is state dimension
-        biginds = ~smallinds(:,ind);
+    small_indexes = (abs(Xi)<lambda);   % find small coefficients
+    Xi(small_indexes)=0;                % set small coeffs to 0 (threshold)
+    for index = 1:n                     % n is state dimension
+        big_indexes = ~small_indexes(:,index);
         % Regress dynamics onto remaining terms to find sparse Xi
-        Xi(biginds,ind) = Theta(:,biginds)\dXdt(:,ind); 
+        Xi(big_indexes,index) = Theta(:,big_indexes)\dXdt(:,index); 
     end
 end
