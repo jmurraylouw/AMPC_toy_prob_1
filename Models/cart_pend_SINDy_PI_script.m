@@ -23,7 +23,7 @@ dx = system_ODE(t,x');
 dx_test = system_ODE(t_test,x_test');
 
 % Add noise to measurements
-sigma = 0.00001; % Magnitude of noise
+sigma = 0.0001; % Magnitude of noise
 % sigma =0;
 x       = x + sigma*randn(size(x));
 x_test  = x_test + sigma*randn(size(x_test));
@@ -45,6 +45,7 @@ X_dot_test = dx_test';
 % Theta to compute function for x_dot
 Theta_X = Theta(X);
 Theta_X_test = Theta(X_test);
+num_functions = size(Theta_X,2)*2; % Number of funxtions in Theta(x,xdot) library
 
 %% Find best model for each state
 Xi = []; % Stores final Xi, which each column a xi per state
@@ -52,8 +53,16 @@ model_errors = []; % error of model for each state
 model_lambdas = []; % lambda used for model of each 
 model_column_guess = []; % Column used as guess for model of each state
 
+Xi_r2 = []; % Stores final Xi, which each column a xi per state
+model_errors_r2 = []; % error of model for each state
+model_lambdas_r2 = []; % lambda used for model of each 
+model_column_guess_r2 = []; % Column used as guess for model of each state
+
+
 warning('off','MATLAB:rankDeficientMatrix'); % Do not warn about rank deficiency
-for i = 1:n
+
+candidate_xi_cell = cell(1,3); % Each element contains matrix with columns as candidate xis for that state
+for i = 1:n % Loop through all states, i
     Theta_i = [Theta_X, diag(X_dot(:,i))*Theta_X]; % Theta used for x1 only
     Theta_i_test = [Theta_X_test, diag(X_dot_test(:,i))*Theta_X_test]; % test Theta used for x1 only
     
@@ -62,45 +71,87 @@ for i = 1:n
     best_column = Inf; % Store best guess of column
     best_xi = []; % Store best xi for model
 
-    figure
-    for lambda = 1e-4:1e-3:1e-2 % Test each lambda in list
+    max_R2adj = 0; % Store minimum model 2-norm error
+    best_lambda_r2 = Inf; % Store best lambda
+    best_column_r2 = Inf; % Store best guess of column
+    best_xi_r2 = []; % Store best xi for model
+    
+    lambda_list = logspace(-3,0,10); % List of lambdas to try
+    % Emptry matrix to store candidate xi models for this state
+    candidate_xi_matrix = zeros(num_functions, length(lambda_list)*size(Theta_i,2)/2+1);
+    index = 1; % keeps track of next empty index in candidate_xi_matrix 
+    
+    for lambda = lambda_list % Test each lambda in list
         tic_lambda=tic();
-        for j = 1:1:size(Theta_i,2) % Guess every column in Theta
+        for j = 1:1:size(Theta_i,2)/2+1 % Guess a column in Theta (only for numerator)
+
             Theta_rm = remove_column(Theta_i,j); % Remove column being guessed
             Theta_rm_test = remove_column(Theta_i_test,j);
-
-    %         xi = lasso(Theta_rm,Theta_1(:,j),'Lambda',lambda);
-            xi = sparsifyDynamics(Theta_rm,Theta_i(:,j),lambda,1); % Sequential LS
-
+            
+            % sparsifyDynamics hogs the time because of backslash/regression:
+            xi = sparsifyDynamics(Theta_rm,Theta_i(:,j),lambda); % Sequential LS
+            
             % Calculate model 2-norm error with test data to compare models
             error = norm(Theta_i_test(:,j) - Theta_rm_test*xi, 1)/norm(Theta_i_test(:,j),1);
-            num_terms = nnz(xi);
-            semilogy(num_terms,error,'.','MarkerSize', 10);
+            
+            % Insert -1 into position j for removed column of Theta
+            xi_full = [xi(1:j-1); -1; xi(j:end)];
+            candidate_xi_matrix(:,index) = xi_full;
+            index=index+1;
+
             hold on;
-            % Update best_xi if error is smallest yet
+            % Update best_xi if error is smaller than record
+            
+            % Cross-validate error bad for online, because of need more data
+            % Or maybe you just store previous data, but then slow for
+            % changes to dynamics
+            % ??? Maybe try change to AIC
+            
             if error < min_error
-                % Insert -1 into position j for removed column of Theta
-                best_xi = [xi(1:j-1); -1; xi(j:end)];
+                best_xi = xi_full; % Update xi
                 min_error = error; % Update min_error value
                 best_lambda = lambda; % Store lambda value used for this column
                 best_column = j; % Store column used for this guess
             end
+            
+            % Calculate Adjusted R^2 value
+            % Loosely based on code by; R P (2020). rsquared (https://www.mathworks.com/matlabcentral/fileexchange/60577-rsquared), MATLAB Central File Exchange. Retrieved May 29, 2020.
+            
+            y_data = Theta_i(:,j); 
+            y_estimated = Theta_rm*xi;
+            num_param = nnz(xi);
+            
+            SSres=sum( (y_data - y_estimated).^2 ); % residual sum of squares
+            SStot=sum( (y_data - mean(y_data)).^2 ); % total sum of squares
+            R2 = 1-SSres/SStot; % standard R squared
+            R2adj = 1 - SSres/SStot * (length(y_data)-1)/(length(y_data)-num_param); % adjust for the number of parameters
+
+            if R2adj > max_R2adj
+                best_xi_r2 = xi_full; % Update xi
+                max_R2adj = R2adj; % Update min_error value
+                best_lambda_r2 = lambda; % Store lambda value used for this column
+                best_column_r2 = j; % Store column used for this guess
+            end
+            
         end % End: for each column, j, in Theta
     end % End: for each lambda in lambda_list
-    
-    xlabel('Number of terms')
-    ylabel('Error')
-    title(['Models for x ', num2str(i)])
-    hold off
     
     % Append model to Xi for this state
     Xi(:,i) = best_xi;
     model_errors(:,i) = min_error;
     model_lambdas(:,i) = best_lambda;
     model_column_guess(:,i) = best_column;
-
+    
+    % If adjusted R^2 used as metric
+    Xi_r2(:,i) = best_xi;
+    model_errors_r2(:,i) = max_R2adj;
+    model_lambdas_r2(:,i) = best_lambda_r2;
+    model_column_guess_r2(:,i) = best_column_r2;
+    
+    candidate_xi_cell(i) = {candidate_xi_matrix}; % Add matrix of candidate models for this state to cell
 end % End: for each state, i
-hold off;
+
+
 %% Visualise Xi
 x_names = {'x1', 'x2', 'x3', 'sin(x1)'};
 % x_names = [x_names, {'1'}, x_names];
@@ -127,6 +178,7 @@ plot(t_hat,x_hat,'--', 'LineWidth', 1); hold off;
 
 toc;
 
+warning('on','MATLAB:rankDeficientMatrix'); % Switch on warning for other scripts
 
 function dx = system_ODE(t,x)
     % 2 states
@@ -180,4 +232,26 @@ function Theta_rm = remove_column(Theta,column)
     % Remove the column of Theta given by index: column
     num_columns = size(Theta,2);
     Theta_rm = Theta(:,(1:num_columns)~=column);
+end
+
+function Xi = sparsifyDynamics(Theta,dXdt,lambda)
+    % Copyright 2015, All Rights Reserved
+    % Code by Steven L. Brunton
+    % For Paper, "Discovering Governing Equations from Data: 
+    %        Sparse Identification of Nonlinear Dynamical Systems"
+    % by S. L. Brunton, J. L. Proctor, and J. N. Kutz
+
+    % compute Sparse regression: sequential least squares
+    Xi = Theta\dXdt;  % initial guess: Least-squares
+
+    % lambda is our sparsification knob.
+    for k=1:5
+        small_indexes = (abs(Xi)<lambda);   % find small coefficients
+        Xi(small_indexes)=0;                % set small coeffs to 0 (threshold)
+
+        big_indexes = ~small_indexes;
+        % Regress dynamics onto remaining terms to find sparse Xi
+        Xi(big_indexes,:) = Theta(:,big_indexes)\dXdt; 
+        
+    end
 end
