@@ -5,22 +5,35 @@
 %% First try with simple system called "system_ODE"
 tic;
 %% Generate Data
+clear all;
+close all;
 x0 = [0.1; -0.2; 0.3];  % Initial condition
-x0_test = [1; 0.1; -0.5]; % Initial condition for test data
+x0_test = [-0.5; -0.1; 1]; % Initial condition for test data
 
 n = length(x0);  % Number of states
-tspan = [0.01:0.01:10];
+tspan = [0.01:0.001:10];
 
 options = odeset('RelTol',1e-12,'AbsTol',1e-12*ones(1,n));
 [t,x] = ode45(@(t,x) system_ODE(t,x), tspan, x0, options);
 [t_test,x_test] = ode45(@(t,x) system_ODE(t,x), tspan, x0_test, options);
 
-subplot(1,2,1), plot(t,x);
-subplot(1,2,2), plot(t_test,x_test);
-
 % Calculate derivatives
+% ??? Change to calculate dx with total variation derivative
 dx = system_ODE(t,x');
 dx_test = system_ODE(t_test,x_test');
+
+% Add noise to measurements
+sigma = 0.00001; % Magnitude of noise
+% sigma =0;
+x       = x + sigma*randn(size(x));
+x_test  = x_test + sigma*randn(size(x_test));
+dx      = dx + sigma*randn(size(dx)); 
+dx_test = dx_test + sigma*randn(size(dx_test));
+
+% Plot measurements
+subplot(1,2,1), plot(t,x);
+subplot(1,2,2), plot(t_test,x_test);
+hold off;
 
 % State and derivative matrixes
 X = x;
@@ -39,6 +52,7 @@ model_errors = []; % error of model for each state
 model_lambdas = []; % lambda used for model of each 
 model_column_guess = []; % Column used as guess for model of each state
 
+warning('off','MATLAB:rankDeficientMatrix'); % Do not warn about rank deficiency
 for i = 1:n
     Theta_i = [Theta_X, diag(X_dot(:,i))*Theta_X]; % Theta used for x1 only
     Theta_i_test = [Theta_X_test, diag(X_dot_test(:,i))*Theta_X_test]; % test Theta used for x1 only
@@ -48,7 +62,8 @@ for i = 1:n
     best_column = Inf; % Store best guess of column
     best_xi = []; % Store best xi for model
 
-    for lambda = 1e-7%:1e-7:1e-5 % Test each lambda in list
+    figure
+    for lambda = 1e-4:1e-3:1e-2 % Test each lambda in list
         tic_lambda=tic();
         for j = 1:1:size(Theta_i,2) % Guess every column in Theta
             Theta_rm = remove_column(Theta_i,j); % Remove column being guessed
@@ -59,7 +74,9 @@ for i = 1:n
 
             % Calculate model 2-norm error with test data to compare models
             error = norm(Theta_i_test(:,j) - Theta_rm_test*xi, 1)/norm(Theta_i_test(:,j),1);
-
+            num_terms = nnz(xi);
+            semilogy(num_terms,error,'.','MarkerSize', 10);
+            hold on;
             % Update best_xi if error is smallest yet
             if error < min_error
                 % Insert -1 into position j for removed column of Theta
@@ -71,6 +88,11 @@ for i = 1:n
         end % End: for each column, j, in Theta
     end % End: for each lambda in lambda_list
     
+    xlabel('Number of terms')
+    ylabel('Error')
+    title(['Models for x ', num2str(i)])
+    hold off
+    
     % Append model to Xi for this state
     Xi(:,i) = best_xi;
     model_errors(:,i) = min_error;
@@ -78,15 +100,15 @@ for i = 1:n
     model_column_guess(:,i) = best_column;
 
 end % End: for each state, i
-
+hold off;
 %% Visualise Xi
-x_names = {'x1', 'x2', 'x3', 'x1.*x2', 'x1.*x3', 'x1.^2', 'x2.^2', 'x3.^2'};
-x_names = [x_names, {'1'}, x_names];
-vis_Xi = visualize_Xi(x_names, Xi, 1)
+x_names = {'x1', 'x2', 'x3', 'sin(x1)'};
+% x_names = [x_names, {'1'}, x_names];
+vis_Xi = visualize_Xi(x_names, Xi, 2)
 
 model_errors
 model_lambdas
-x_names(model_column_guess-1) % Guessed column of Theta that worked best
+model_column_guess % Guessed column of Theta that worked best
 
 
 %% Run model and compare to actual data
@@ -95,15 +117,16 @@ x0 = [-6; 3; 0.8]; % Initial condition for test data
 tspan = [0.01:0.01:20];
 
 options = odeset('RelTol',1e-12,'AbsTol',1e-12*ones(1,n));
+[t_hat,x_hat] = ode45(@(t,x) SINDy_PI_ODE(t, x, Xi), tspan, x0, options);
 [t,x] = ode45(@(t,x) system_ODE(t, x), tspan, x0, options);
-[t_hat,x_hat] = ode45(@(t,x) SINDy_PI_ODE(t, x, Xi), tspan, x0);
 
 figure
 plot(t,x); hold on;
-plot(t_hat,x_hat,'--'); hold off;
+plot(t_hat,x_hat,'--', 'LineWidth', 1); hold off;
 
 
 toc;
+
 
 function dx = system_ODE(t,x)
     % 2 states
@@ -113,19 +136,25 @@ function dx = system_ODE(t,x)
     
     dx = [
             - x1 + 3*x3 - x2.^2;
-            (10*x1  - x2 - 2*x1.*x3)./(1+x1.^2);
-            x1.*x2 - 3*x3
+            (10*x1  - x2 - 2*x1.*x3)./(1 + sin(x1) + x1.^2);
+            (x1.*x2 - 3*x3)
     ];
 
 end
 
 function Theta = Theta(X)
-    x1 = X(:,1);
-    x2 = X(:,2);
-    x3 = X(:,3);
-    samples = length(x1); % Number of samples per state (number of rows)
-    
-    Theta = [ones(samples,1), x1, x2, x3, x1.*x2, x1.*x3, x1.^2, x2.^2, x3.^2];
+%     x1 = X(:,1);
+%     x2 = X(:,2);
+%     x3 = X(:,3);
+%     
+%     Theta = [ones(samples,1), x1, x2, x3, x1.*x2, x1.*x3, x1.^2, x2.^2, x3.^2];
+    X = [X, sin(X(:,1))];
+    Theta = [ones(size(X,1),1), X];
+    for i = 1:size(X,2)
+        for j = i:size(X,2)
+            Theta = [Theta, X(:,i).*X(:,j)];
+        end
+    end
 end
 
 function x_dot = SINDy_PI_ODE(t, x, Xi)
