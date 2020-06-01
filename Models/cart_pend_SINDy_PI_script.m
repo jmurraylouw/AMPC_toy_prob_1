@@ -3,43 +3,45 @@
 % github.com/dynamicslab/SINDy-PI
 
 %% First try with simple system called "system_ODE"
+close all;
+clear all;
+
 tic;
 
 %% Read Data
-clear all;
-close all;
-x0 = [0.1; -0.2; 0.3];  % Initial condition
 
-n = length(x0);  % Number of states
-tspan = [0.01:0.01:10];
+% Load: x0 and out from simulation
+load('rational_toy_with_input_data_1.mat')
 
-options = odeset('RelTol',1e-12,'AbsTol',1e-12*ones(1,n));
-[t,x] = ode45(@(t,x) rational_toy_ODE(t,x), tspan, x0, options);
+% x0 = [0.1; -0.2; 0.3];  % Initial condition
+% n = length(x0);  % Number of states
+% tspan = [0.01:0.01:10];
+% options = odeset('RelTol',1e-12,'AbsTol',1e-12*ones(1,n));
+% [t,x] = ode45(@(t,x) rational_toy_ODE(t,x), tspan, x0, options);
 
 % Calculate derivatives
 % ??? Change to calculate dx with total variation derivative
-x_dot = rational_toy_ODE(t,x');
+% x_dot = rational_toy_ODE(t,x');
 
-% t = tout;
-% x = out.x.Data;
-% x_dot = out.x_dot.Data;
+t = out.tout;
+X = out.x.Data;
+X_dot = out.x_dot.Data;
+U = out.u.Data;
+
+n = size(X,2); % Number of states
 
 % Add noise to measurements
 sigma = 0.0001; % Magnitude of noise (max 0.0001 so far)
 % sigma = 0;
-x       = x + sigma*randn(size(x));
-x_dot      = x_dot + sigma*randn(size(x_dot)); 
+X       = X + sigma*randn(size(X));
+X_dot   = X_dot + sigma*randn(size(X_dot)); 
 
 % Plot measurements
-plot(t,x);
+plot(t,X);
 figure
 
-% State and derivative matrixes
-X = x;
-X_dot = x_dot';
-
 % Theta to compute function for x_dot
-Theta_X = Theta(X);
+Theta_X = Theta(X,U);
 num_functions = size(Theta_X,2)*2; % Number of funxtions in Theta(x,xdot) library
 
 %% Find best model for each state
@@ -119,7 +121,7 @@ end % End: for each state, i
 
 
 %% Visualise Xi
-x_names = {'x1', 'x2', 'x3', 'sin(x1)'};
+x_names = {'x1', 'x2', 'x3', 'u', 'sin(x1)'};
 % x_names = [x_names, {'1'}, x_names];
 vis_Xi = visualize_Xi(x_names, Xi, 2)
 
@@ -131,43 +133,55 @@ model_column_guess % Guessed column of Theta that worked best
 %% Validatation
 % Run model on new data and compare to actual measurements
 
-x0 = [-6; 3; 0.8]; % Initial condition for test data
-tspan = [0.01:0.01:20];
+% Load xo, out from a simulation
+load('rational_toy_with_input_data_2.mat')
+tspan = out.tout;
+X = out.x.Data;
+U = out.u.Data;
 
-options = odeset('RelTol',1e-12,'AbsTol',1e-12*ones(1,n));
-[t_hat,x_hat] = ode45(@(t,x) SINDy_PI_ODE(t, x, Xi), tspan, x0, options);
-[t,x] = ode45(@(t,x) rational_toy_ODE(t, x), tspan, x0, options);
+% Generate data with SINDY-PI model
+% [t_hat,x_hat] = ode45(@(t,x) SINDy_PI_ODE(t, x, U(), Xi), t_data, x0, options);
+x_hat(1,:) = x0;
+t_hat(1,:) = 0;
 
+for i=2:size(U,1)
+    [t_1,x_1] = ode113(@(t_1,y_1) SINDy_PI_ODE(t_1,y_1,U(i-1,:),Xi), tspan(i-1:i,1), x0);
+    x_hat(i,:) = x_1(end,:);
+    t_hat(i,:) = t_1(end,:);
+    x0 = x_hat(i,:)';
+end
+
+% PLot simulation data vs model data
 figure
-plot(t,x); hold on;
+plot(tspan,X); hold on;
 plot(t_hat,x_hat,'--', 'LineWidth', 1); hold off;
 
 
-toc;
+toc; % Display execution time
 
 warning('on','MATLAB:rankDeficientMatrix'); % Switch on warning for other scripts
 
-function dx = rational_toy_ODE(t,x)
+function dx = rational_toy_ODE(t,x,u)
     % 2 states
     x1 = x(1,:);
     x2 = x(2,:);
     x3 = x(3,:);
     
     dx = [
-            - x1 + 3*x3 - x2.^2;
+            - x1 + 3*x3 - x2.^2 + u;
             (10*x1  - x2 - 2*x1.*x3)./(1.1 + sin(x1) + x1.^2);
             (x1.*x2 - 3*x3)
     ];
 
 end
 
-function Theta = Theta(X)
+function Theta = Theta(X, U)
 %     x1 = X(:,1);
 %     x2 = X(:,2);
 %     x3 = X(:,3);
 %     
 %     Theta = [ones(samples,1), x1, x2, x3, x1.*x2, x1.*x3, x1.^2, x2.^2, x3.^2];
-    X = [X, sin(X(:,1))];
+    X = [X, U, sin(X(:,1))];
     Theta = [ones(size(X,1),1), X];
     for i = 1:size(X,2)
         for j = i:size(X,2)
@@ -176,14 +190,14 @@ function Theta = Theta(X)
     end
 end
 
-function x_dot = SINDy_PI_ODE(t, x, Xi)
+function x_dot = SINDy_PI_ODE(t, x, u, Xi)
     % ODE created by SINDy_PI model defined by Theta and Xi
     % x is column state vector
     % x_dot is column derivative vector
     n = length(x); % Number of states
     
     X = x'; % Row vector fits SINDY format  
-    Theta_X = Theta(X); % Calculate library of functions once
+    Theta_X = Theta(X,u); % Calculate library of functions once
     X_dot = zeros(size(X)); % Allocate space once
     for i = 1:n % For each state
         xi = Xi(:,i); 
