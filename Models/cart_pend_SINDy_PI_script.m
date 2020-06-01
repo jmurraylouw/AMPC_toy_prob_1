@@ -243,7 +243,8 @@ function Xi = sparsifyDynamics(Theta,dXdt,lambda)
 
     % compute Sparse regression: sequential least squares
     Xi = Theta\dXdt;  % initial guess: Least-squares
-
+    Xi_prev = Xi;
+    Xi;
     % lambda is our sparsification knob.
     for k=1:5
         small_indexes = (abs(Xi)<lambda);   % find small coefficients
@@ -251,7 +252,16 @@ function Xi = sparsifyDynamics(Theta,dXdt,lambda)
 
         big_indexes = ~small_indexes;
         % Regress dynamics onto remaining terms to find sparse Xi
-        Xi(big_indexes,:) = Theta(:,big_indexes)\dXdt; 
+        Xi(big_indexes,:) = Theta(:,big_indexes)\dXdt;
         
+        if(Xi == Xi_prev)
+            % To save computations:
+            % If Xi already converged, then exit loop
+            break;
+        end
+        Xi_prev = Xi; % Save previous Xi
+
+        %         pause
+        Xi;
     end
 end
