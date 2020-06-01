@@ -4,6 +4,7 @@
 
 %% First try with simple system called "system_ODE"
 tic;
+
 %% Generate Data
 clear all;
 close all;
@@ -14,13 +15,13 @@ n = length(x0);  % Number of states
 tspan = [0.01:0.001:10];
 
 options = odeset('RelTol',1e-12,'AbsTol',1e-12*ones(1,n));
-[t,x] = ode45(@(t,x) rational_ODE(t,x), tspan, x0, options);
-[t_test,x_test] = ode45(@(t,x) rational_ODE(t,x), tspan, x0_test, options);
+[t,x] = ode45(@(t,x) rational_toy_ODE(t,x), tspan, x0, options);
+[t_test,x_test] = ode45(@(t,x) rational_toy_ODE(t,x), tspan, x0_test, options);
 
 % Calculate derivatives
 % ??? Change to calculate dx with total variation derivative
-dx = rational_ODE(t,x');
-dx_test = rational_ODE(t_test,x_test');
+dx = rational_toy_ODE(t,x');
+dx_test = rational_toy_ODE(t_test,x_test');
 
 % Add noise to measurements
 sigma = 0.0001; % Magnitude of noise
@@ -34,6 +35,8 @@ dx_test = dx_test + sigma*randn(size(dx_test));
 subplot(1,2,1), plot(t,x);
 subplot(1,2,2), plot(t_test,x_test);
 hold off;
+
+figure
 
 % State and derivative matrixes
 X = x;
@@ -76,7 +79,7 @@ for i = 1:n % Loop through all states, i
     best_column_r2 = Inf; % Store best guess of column
     best_xi_r2 = []; % Store best xi for model
     
-    lambda_list = logspace(-3,0,10); % List of lambdas to try
+    lambda_list = logspace(-3,-1,10); % List of lambdas to try
     % Emptry matrix to store candidate xi models for this state
     candidate_xi_matrix = zeros(num_functions, length(lambda_list)*size(Theta_i,2)/2+1);
     index = 1; % keeps track of next empty index in candidate_xi_matrix 
@@ -94,12 +97,19 @@ for i = 1:n % Loop through all states, i
             % Calculate model 2-norm error with test data to compare models
             error = norm(Theta_i_test(:,j) - Theta_rm_test*xi, 1)/norm(Theta_i_test(:,j),1);
             
+            % Error without test data, penalised for number of parameters
+            num_terms = nnz(xi)+1;
+            error1 = norm(Theta_i(:,j) - Theta_rm*xi, 1)/norm(Theta_i(:,j),1);
+            metric = error*num_terms;
+            
+            subplot(3,3,i), semilogy(num_terms,error1, 'x'), hold on;
+            subplot(3,3,i+3), semilogy(num_terms,metric, 'x'), hold on;
+            subplot(3,3,i+6), semilogy(num_terms,error, 'x'), hold on;
+            
+            
             % Insert -1 into position j for removed column of Theta
             xi_full = [xi(1:j-1); -1; xi(j:end)];
-            candidate_xi_matrix(:,index) = xi_full;
-            index=index+1;
-
-            hold on;
+            
             % Update best_xi if error is smaller than record
             
             % Cross-validate error bad for online, because of need more data
@@ -110,6 +120,8 @@ for i = 1:n % Loop through all states, i
             if error < min_error
                 best_xi = xi_full; % Update xi
                 min_error = error; % Update min_error value
+                best_error1 = error1; % Save 2-norm error with original data
+                best_metric = metric;
                 best_lambda = lambda; % Store lambda value used for this column
                 best_column = j; % Store column used for this guess
             end
@@ -136,19 +148,32 @@ for i = 1:n % Loop through all states, i
         end % End: for each column, j, in Theta
     end % End: for each lambda in lambda_list
     
+    y_scale = [1e-5 1];
+    
+    subplot(3,3,i), plot(nnz(best_xi),best_error1, 'o')
+    ylabel('data error');
+    ylim(y_scale);
+    grid on;
+    hold off;
+    
+    subplot(3,3,i+3), plot(nnz(best_xi),best_metric, 'o')
+    ylabel('metric');
+    ylim(y_scale);
+    grid on;
+    hold off;
+    
+    subplot(3,3,i+6), plot(nnz(best_xi),min_error, 'o')
+    ylabel('extrapolate error');
+    ylim(y_scale);
+    grid on;
+    hold off;
+    
     % Append model to Xi for this state
     Xi(:,i) = best_xi;
     model_errors(:,i) = min_error;
     model_lambdas(:,i) = best_lambda;
     model_column_guess(:,i) = best_column;
     
-    % If adjusted R^2 used as metric
-    Xi_r2(:,i) = best_xi;
-    model_errors_r2(:,i) = max_R2adj;
-    model_lambdas_r2(:,i) = best_lambda_r2;
-    model_column_guess_r2(:,i) = best_column_r2;
-    
-    candidate_xi_cell(i) = {candidate_xi_matrix}; % Add matrix of candidate models for this state to cell
 end % End: for each state, i
 
 
@@ -156,20 +181,22 @@ end % End: for each state, i
 x_names = {'x1', 'x2', 'x3', 'sin(x1)'};
 % x_names = [x_names, {'1'}, x_names];
 vis_Xi = visualize_Xi(x_names, Xi, 2)
+vis_Xi_r2 = visualize_Xi(x_names, Xi_r2, 2);
 
 model_errors
 model_lambdas
 model_column_guess % Guessed column of Theta that worked best
 
 
-%% Run model and compare to actual data
+%% Validatation
+% Run model on new data and compare to actual measurements
 
 x0 = [-6; 3; 0.8]; % Initial condition for test data
 tspan = [0.01:0.01:20];
 
 options = odeset('RelTol',1e-12,'AbsTol',1e-12*ones(1,n));
 [t_hat,x_hat] = ode45(@(t,x) SINDy_PI_ODE(t, x, Xi), tspan, x0, options);
-[t,x] = ode45(@(t,x) rational_ODE(t, x), tspan, x0, options);
+[t,x] = ode45(@(t,x) rational_toy_ODE(t, x), tspan, x0, options);
 
 figure
 plot(t,x); hold on;
@@ -180,7 +207,7 @@ toc;
 
 warning('on','MATLAB:rankDeficientMatrix'); % Switch on warning for other scripts
 
-function dx = rational_ODE(t,x)
+function dx = rational_toy_ODE(t,x)
     % 2 states
     x1 = x(1,:);
     x2 = x(2,:);
@@ -188,7 +215,7 @@ function dx = rational_ODE(t,x)
     
     dx = [
             - x1 + 3*x3 - x2.^2;
-            (10*x1  - x2 - 2*x1.*x3)./(1 + sin(x1) + x1.^2);
+            (10*x1  - x2 - 2*x1.*x3)./(1.1 + sin(x1) + x1.^2);
             (x1.*x2 - 3*x3)
     ];
 
@@ -244,7 +271,7 @@ function Xi = sparsifyDynamics(Theta,dXdt,lambda)
     % compute Sparse regression: sequential least squares
     Xi = Theta\dXdt;  % initial guess: Least-squares
     Xi_prev = Xi;
-    Xi;
+    
     % lambda is our sparsification knob.
     for k=1:5
         small_indexes = (abs(Xi)<lambda);   % find small coefficients
@@ -255,13 +282,10 @@ function Xi = sparsifyDynamics(Theta,dXdt,lambda)
         Xi(big_indexes,:) = Theta(:,big_indexes)\dXdt;
         
         if(Xi == Xi_prev)
-            % To save computations:
+            % To save computations, almost by half:
             % If Xi already converged, then exit loop
             break;
         end
         Xi_prev = Xi; % Save previous Xi
-
-        %         pause
-        Xi;
     end
 end
