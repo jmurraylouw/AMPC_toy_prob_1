@@ -14,13 +14,13 @@ n = length(x0);  % Number of states
 tspan = [0.01:0.001:10];
 
 options = odeset('RelTol',1e-12,'AbsTol',1e-12*ones(1,n));
-[t,x] = ode45(@(t,x) system_ODE(t,x), tspan, x0, options);
-[t_test,x_test] = ode45(@(t,x) system_ODE(t,x), tspan, x0_test, options);
+[t,x] = ode45(@(t,x) rational_ODE(t,x), tspan, x0, options);
+[t_test,x_test] = ode45(@(t,x) rational_ODE(t,x), tspan, x0_test, options);
 
 % Calculate derivatives
 % ??? Change to calculate dx with total variation derivative
-dx = system_ODE(t,x');
-dx_test = system_ODE(t_test,x_test');
+dx = rational_ODE(t,x');
+dx_test = rational_ODE(t_test,x_test');
 
 % Add noise to measurements
 sigma = 0.0001; % Magnitude of noise
@@ -169,7 +169,7 @@ tspan = [0.01:0.01:20];
 
 options = odeset('RelTol',1e-12,'AbsTol',1e-12*ones(1,n));
 [t_hat,x_hat] = ode45(@(t,x) SINDy_PI_ODE(t, x, Xi), tspan, x0, options);
-[t,x] = ode45(@(t,x) system_ODE(t, x), tspan, x0, options);
+[t,x] = ode45(@(t,x) rational_ODE(t, x), tspan, x0, options);
 
 figure
 plot(t,x); hold on;
@@ -180,7 +180,7 @@ toc;
 
 warning('on','MATLAB:rankDeficientMatrix'); % Switch on warning for other scripts
 
-function dx = system_ODE(t,x)
+function dx = rational_ODE(t,x)
     % 2 states
     x1 = x(1,:);
     x2 = x(2,:);
