@@ -12,7 +12,7 @@ x0 = [0.1; -0.2; 0.3];  % Initial condition
 x0_test = [-0.5; -0.1; 1]; % Initial condition for test data
 
 n = length(x0);  % Number of states
-tspan = [0.01:0.001:10];
+tspan = [0.01:0.01:10];
 
 options = odeset('RelTol',1e-12,'AbsTol',1e-12*ones(1,n));
 [t,x] = ode45(@(t,x) rational_toy_ODE(t,x), tspan, x0, options);
@@ -24,8 +24,8 @@ dx = rational_toy_ODE(t,x');
 dx_test = rational_toy_ODE(t_test,x_test');
 
 % Add noise to measurements
-sigma = 0.0001; % Magnitude of noise
-% sigma =0;
+sigma = 0.0001; % Magnitude of noise (max 0.0001 so far)
+% sigma = 0;
 x       = x + sigma*randn(size(x));
 x_test  = x_test + sigma*randn(size(x_test));
 dx      = dx + sigma*randn(size(dx)); 
@@ -56,15 +56,8 @@ model_errors = []; % error of model for each state
 model_lambdas = []; % lambda used for model of each 
 model_column_guess = []; % Column used as guess for model of each state
 
-Xi_r2 = []; % Stores final Xi, which each column a xi per state
-model_errors_r2 = []; % error of model for each state
-model_lambdas_r2 = []; % lambda used for model of each 
-model_column_guess_r2 = []; % Column used as guess for model of each state
-
-
 warning('off','MATLAB:rankDeficientMatrix'); % Do not warn about rank deficiency
 
-candidate_xi_cell = cell(1,3); % Each element contains matrix with columns as candidate xis for that state
 for i = 1:n % Loop through all states, i
     Theta_i = [Theta_X, diag(X_dot(:,i))*Theta_X]; % Theta used for x1 only
     Theta_i_test = [Theta_X_test, diag(X_dot_test(:,i))*Theta_X_test]; % test Theta used for x1 only
@@ -73,17 +66,9 @@ for i = 1:n % Loop through all states, i
     best_lambda = Inf; % Store best lambda
     best_column = Inf; % Store best guess of column
     best_xi = []; % Store best xi for model
-
-    max_R2adj = 0; % Store minimum model 2-norm error
-    best_lambda_r2 = Inf; % Store best lambda
-    best_column_r2 = Inf; % Store best guess of column
-    best_xi_r2 = []; % Store best xi for model
-    
+   
     lambda_list = logspace(-3,-1,10); % List of lambdas to try
-    % Emptry matrix to store candidate xi models for this state
-    candidate_xi_matrix = zeros(num_functions, length(lambda_list)*size(Theta_i,2)/2+1);
-    index = 1; % keeps track of next empty index in candidate_xi_matrix 
-    
+   
     for lambda = lambda_list % Test each lambda in list
         tic_lambda=tic();
         for j = 1:1:size(Theta_i,2)/2+1 % Guess a column in Theta (only for numerator)
@@ -96,16 +81,19 @@ for i = 1:n % Loop through all states, i
             
             % Calculate model 2-norm error with test data to compare models
             error = norm(Theta_i_test(:,j) - Theta_rm_test*xi, 1)/norm(Theta_i_test(:,j),1);
+            % error is 2-norm error of unseen data
             
             % Error without test data, penalised for number of parameters
             num_terms = nnz(xi)+1;
+            % Error1 is 2-norm error of original data
             error1 = norm(Theta_i(:,j) - Theta_rm*xi, 1)/norm(Theta_i(:,j),1);
-            metric = error*num_terms;
+            metric = error1*num_terms^2;
             
+            % Plot error vs #terms of all candidate models
             subplot(3,3,i), semilogy(num_terms,error1, 'x'), hold on;
             subplot(3,3,i+3), semilogy(num_terms,metric, 'x'), hold on;
             subplot(3,3,i+6), semilogy(num_terms,error, 'x'), hold on;
-            
+          
             
             % Insert -1 into position j for removed column of Theta
             xi_full = [xi(1:j-1); -1; xi(j:end)];
@@ -124,30 +112,11 @@ for i = 1:n % Loop through all states, i
                 best_metric = metric;
                 best_lambda = lambda; % Store lambda value used for this column
                 best_column = j; % Store column used for this guess
-            end
-            
-            % Calculate Adjusted R^2 value
-            % Loosely based on code by; R P (2020). rsquared (https://www.mathworks.com/matlabcentral/fileexchange/60577-rsquared), MATLAB Central File Exchange. Retrieved May 29, 2020.
-            
-            y_data = Theta_i(:,j); 
-            y_estimated = Theta_rm*xi;
-            num_param = nnz(xi);
-            
-            SSres=sum( (y_data - y_estimated).^2 ); % residual sum of squares
-            SStot=sum( (y_data - mean(y_data)).^2 ); % total sum of squares
-            R2 = 1-SSres/SStot; % standard R squared
-            R2adj = 1 - SSres/SStot * (length(y_data)-1)/(length(y_data)-num_param); % adjust for the number of parameters
-
-            if R2adj > max_R2adj
-                best_xi_r2 = xi_full; % Update xi
-                max_R2adj = R2adj; % Update min_error value
-                best_lambda_r2 = lambda; % Store lambda value used for this column
-                best_column_r2 = j; % Store column used for this guess
-            end
-            
+            end            
         end % End: for each column, j, in Theta
     end % End: for each lambda in lambda_list
     
+    % Plot chosen model on error graph
     y_scale = [1e-5 1];
     
     subplot(3,3,i), plot(nnz(best_xi),best_error1, 'o')
@@ -181,7 +150,6 @@ end % End: for each state, i
 x_names = {'x1', 'x2', 'x3', 'sin(x1)'};
 % x_names = [x_names, {'1'}, x_names];
 vis_Xi = visualize_Xi(x_names, Xi, 2)
-vis_Xi_r2 = visualize_Xi(x_names, Xi_r2, 2);
 
 model_errors
 model_lambdas
