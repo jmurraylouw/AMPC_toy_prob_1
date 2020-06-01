@@ -5,49 +5,41 @@
 %% First try with simple system called "system_ODE"
 tic;
 
-%% Generate Data
+%% Read Data
 clear all;
 close all;
 x0 = [0.1; -0.2; 0.3];  % Initial condition
-x0_test = [-0.5; -0.1; 1]; % Initial condition for test data
 
 n = length(x0);  % Number of states
 tspan = [0.01:0.01:10];
 
 options = odeset('RelTol',1e-12,'AbsTol',1e-12*ones(1,n));
 [t,x] = ode45(@(t,x) rational_toy_ODE(t,x), tspan, x0, options);
-[t_test,x_test] = ode45(@(t,x) rational_toy_ODE(t,x), tspan, x0_test, options);
 
 % Calculate derivatives
 % ??? Change to calculate dx with total variation derivative
-dx = rational_toy_ODE(t,x');
-dx_test = rational_toy_ODE(t_test,x_test');
+x_dot = rational_toy_ODE(t,x');
+
+% t = tout;
+% x = out.x.Data;
+% x_dot = out.x_dot.Data;
 
 % Add noise to measurements
 sigma = 0.0001; % Magnitude of noise (max 0.0001 so far)
 % sigma = 0;
 x       = x + sigma*randn(size(x));
-x_test  = x_test + sigma*randn(size(x_test));
-dx      = dx + sigma*randn(size(dx)); 
-dx_test = dx_test + sigma*randn(size(dx_test));
+x_dot      = x_dot + sigma*randn(size(x_dot)); 
 
 % Plot measurements
-subplot(1,2,1), plot(t,x);
-subplot(1,2,2), plot(t_test,x_test);
-hold off;
-
+plot(t,x);
 figure
 
 % State and derivative matrixes
 X = x;
-X_dot = dx';
-
-X_test = x_test;
-X_dot_test = dx_test';
+X_dot = x_dot';
 
 % Theta to compute function for x_dot
 Theta_X = Theta(X);
-Theta_X_test = Theta(X_test);
 num_functions = size(Theta_X,2)*2; % Number of funxtions in Theta(x,xdot) library
 
 %% Find best model for each state
@@ -60,9 +52,8 @@ warning('off','MATLAB:rankDeficientMatrix'); % Do not warn about rank deficiency
 
 for i = 1:n % Loop through all states, i
     Theta_i = [Theta_X, diag(X_dot(:,i))*Theta_X]; % Theta used for x1 only
-    Theta_i_test = [Theta_X_test, diag(X_dot_test(:,i))*Theta_X_test]; % test Theta used for x1 only
     
-    min_error = Inf; % Store minimum model 2-norm error
+    min_metric = Inf; % Store minimum model 2-norm error
     best_lambda = Inf; % Store best lambda
     best_column = Inf; % Store best guess of column
     best_xi = []; % Store best xi for model
@@ -74,72 +65,53 @@ for i = 1:n % Loop through all states, i
         for j = 1:1:size(Theta_i,2)/2+1 % Guess a column in Theta (only for numerator)
 
             Theta_rm = remove_column(Theta_i,j); % Remove column being guessed
-            Theta_rm_test = remove_column(Theta_i_test,j);
-            
+             
             % sparsifyDynamics hogs the time because of backslash/regression:
             xi = sparsifyDynamics(Theta_rm,Theta_i(:,j),lambda); % Sequential LS
             
-            % Calculate model 2-norm error with test data to compare models
-            error = norm(Theta_i_test(:,j) - Theta_rm_test*xi, 1)/norm(Theta_i_test(:,j),1);
-            % error is 2-norm error of unseen data
-            
-            % Error without test data, penalised for number of parameters
-            num_terms = nnz(xi)+1;
-            % Error1 is 2-norm error of original data
+            % Calculate 2-norm error without test data, penalised for number of parameters
+            num_terms = nnz(xi)+1; % Number of non-zero terms in model
             error1 = norm(Theta_i(:,j) - Theta_rm*xi, 1)/norm(Theta_i(:,j),1);
-            metric = error1*num_terms^2;
+            metric = error1*num_terms^2; % Metric used to compare candidate models
+            % Mertric promotes sparsity
             
             % Plot error vs #terms of all candidate models
-            subplot(3,3,i), semilogy(num_terms,error1, 'x'), hold on;
-            subplot(3,3,i+3), semilogy(num_terms,metric, 'x'), hold on;
-            subplot(3,3,i+6), semilogy(num_terms,error, 'x'), hold on;
-          
-            
-            % Insert -1 into position j for removed column of Theta
-            xi_full = [xi(1:j-1); -1; xi(j:end)];
-            
-            % Update best_xi if error is smaller than record
-            
-            % Cross-validate error bad for online, because of need more data
-            % Or maybe you just store previous data, but then slow for
-            % changes to dynamics
+            subplot(2,3,i), semilogy(num_terms,error1, 'x'), hold on;
+            subplot(2,3,i+3), semilogy(num_terms,metric, 'x'), hold on;          
+
             % ??? Maybe try change to AIC
             
-            if error < min_error
-                best_xi = xi_full; % Update xi
-                min_error = error; % Update min_error value
-                best_error1 = error1; % Save 2-norm error with original data
-                best_metric = metric;
+            % Update best_xi if metric is smaller than smallest metric yet
+            if metric < min_metric
+                best_xi = [xi(1:j-1); -1; xi(j:end)];  % Insert -1 into position j for removed column of Theta
+                min_metric = metric; % Update min_error value
+                best_error1 = error1; % Save 2-norm error of original data
                 best_lambda = lambda; % Store lambda value used for this column
                 best_column = j; % Store column used for this guess
-            end            
+            end
+            
         end % End: for each column, j, in Theta
+        
     end % End: for each lambda in lambda_list
     
     % Plot chosen model on error graph
     y_scale = [1e-5 1];
     
-    subplot(3,3,i), plot(nnz(best_xi),best_error1, 'o')
+    subplot(2,3,i), plot(nnz(best_xi),best_error1, 'o')
     ylabel('data error');
     ylim(y_scale);
     grid on;
     hold off;
     
-    subplot(3,3,i+3), plot(nnz(best_xi),best_metric, 'o')
+    subplot(2,3,i+3), plot(nnz(best_xi),min_metric, 'o')
     ylabel('metric');
-    ylim(y_scale);
-    grid on;
-    hold off;
-    
-    subplot(3,3,i+6), plot(nnz(best_xi),min_error, 'o')
-    ylabel('extrapolate error');
     ylim(y_scale);
     grid on;
     hold off;
     
     % Append model to Xi for this state
     Xi(:,i) = best_xi;
-    model_errors(:,i) = min_error;
+    model_errors(:,i) = min_metric;
     model_lambdas(:,i) = best_lambda;
     model_column_guess(:,i) = best_column;
     
