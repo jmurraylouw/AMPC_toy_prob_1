@@ -13,40 +13,30 @@ tic;
 % Load: x0 and out from simulation
 
 % load('rational_toy_with_input_data_1.mat') % Polyorder = 2
-
-% x0 = [0.1; -0.2; 0.3];  % Initial condition
-% n = length(x0);  % Number of states
-% tspan = [0.01:0.01:10];
-% options = odeset('RelTol',1e-12,'AbsTol',1e-12*ones(1,n));
-% [t,x] = ode45(@(t,x) rational_toy_ODE(t,x), tspan, x0, options);
-
-% Calculate derivatives
-% ??? Change to calculate dx with total variation derivative
-% x_dot = rational_toy_ODE(t,x');
-
 load('rational_toy_poly3_1.mat') % Polyorder = 3
 
 t = out.tout;
 X = out.x.Data;
-X_dot = out.x_dot.Data;
+X_dot = out.x_dot.Data; % ??? Change to calculate dx with total variation derivative
 U = out.u.Data;
 
 n = size(X,2); % Number of states
 
 % Add noise to measurements
-sigma = 0.001; % Magnitude of noise (max 0.01 so far)
-sigma = 0;
+sigma = 0.000001; % Magnitude of noise (max 0.01 so far)
+% sigma = 0;
 X       = X + sigma*randn(size(X));
 X_dot   = X_dot + sigma*randn(size(X_dot)); 
 
 % Plot measurements
 plot(t,X);
+title("Training data");
 figure
 
 %% Find best model for each state
 
 polyorder = 3; % Highest order polynomial term in function library
-lambda_list = logspace(-3,-1,10); % List of lambdas to try
+lambda_list = logspace(-4,-2,20); % List of lambdas to try
 lambda_list = 1e-3;
 
 % Theta to compute function for x_dot
@@ -145,8 +135,6 @@ for i = 1:n*2
     subplot(2,n,i), ylim
 end
 
-toc
-
 %% Compare real Xi to model Xi with bar plots
 figure;
 for i = 1:n
@@ -163,6 +151,8 @@ model_errors
 model_lambdas
 model_column_guess % Guessed column of Theta that worked best
 
+disp('Model computation time')
+toc; % Display computation time
 
 %% Validatation
 % Run model on new data and compare to actual measurements
@@ -192,8 +182,10 @@ end
 figure
 plot(tspan,X); hold on;
 plot(t_hat,x_hat,'--', 'LineWidth', 1); hold off;
+title('Validation data vs Model');
 
-toc; % Display execution time
+disp('Total execution time')
+toc; % Display total execution time
 
 warning('on','MATLAB:rankDeficientMatrix'); % Switch on warning for other scripts
 
