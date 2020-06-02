@@ -11,7 +11,8 @@ tic;
 %% Read Data
 
 % Load: x0 and out from simulation
-load('rational_toy_with_input_data_1.mat')
+
+% load('rational_toy_with_input_data_1.mat') % Polyorder = 2
 
 % x0 = [0.1; -0.2; 0.3];  % Initial condition
 % n = length(x0);  % Number of states
@@ -22,6 +23,8 @@ load('rational_toy_with_input_data_1.mat')
 % Calculate derivatives
 % ??? Change to calculate dx with total variation derivative
 % x_dot = rational_toy_ODE(t,x');
+
+load('rational_toy_poly3_1.mat') % Polyorder = 3
 
 t = out.tout;
 X = out.x.Data;
@@ -40,11 +43,16 @@ X_dot   = X_dot + sigma*randn(size(X_dot));
 plot(t,X);
 figure
 
+%% Find best model for each state
+
+polyorder = 3; % Highest order polynomial term in function library
+lambda_list = logspace(-3,-1,10); % List of lambdas to try
+lambda_list = 1e-3;
+
 % Theta to compute function for x_dot
-Theta_X = Theta(X,U);
+Theta_X = Theta(X,U,polyorder);
 num_functions = size(Theta_X,2)*2; % Number of funxtions in Theta(x,xdot) library
 
-%% Find best model for each state
 Xi = []; % Stores final Xi, which each column a xi per state
 model_errors = []; % error of model for each state
 model_lambdas = []; % lambda used for model of each 
@@ -59,8 +67,6 @@ for i = 1:n % Loop through all states, i
     best_lambda = Inf; % Store best lambda
     best_column = Inf; % Store best guess of column
     best_xi = []; % Store best xi for model
-   
-    lambda_list = logspace(-3,-1,10); % List of lambdas to try
    
     for lambda = lambda_list % Test each lambda in list
         tic_lambda=tic();
@@ -150,7 +156,8 @@ end
 %% Visualise Xi
 x_names = {'x1', 'x2', 'x3', 'u', 'sin(x1)'};
 % x_names = [x_names, {'1'}, x_names];
-vis_Xi = visualize_Xi(x_names, Xi, 2);
+polyorder = 3;
+vis_Xi = visualize_Xi(x_names, Xi, polyorder);
 
 model_errors
 model_lambdas
@@ -161,19 +168,21 @@ model_column_guess % Guessed column of Theta that worked best
 % Run model on new data and compare to actual measurements
 
 % Load xo, out from a simulation
-load('rational_toy_with_input_data_2.mat')
+% load('rational_toy_with_input_data_2.mat') % Polyorder = 2
+load('rational_toy_poly3_2.mat') % Polyorder = 3
+
 tspan = out.tout;
 X = out.x.Data;
 U = out.u.Data;
 
 % Generate data with SINDY-PI model
-% [t_hat,x_hat] = ode45(@(t,x) SINDy_PI_ODE(t, x, U(), Xi), t_data, x0, options);
 x_hat(1,:) = x0;
 t_hat(1,:) = 0;
 
 % Solve for small intervals with constant u
 for i=2:size(U,1)
-    [t_1,x_1] = ode45(@(t_1,y_1) SINDy_PI_ODE(t_1,y_1,U(i-1,:),Xi), tspan(i-1:i,1), x0);
+    u = (U(i-1,:)+U(i,:))/2; % Assume constant u at average of time interval
+    [t_1,x_1] = ode45(@(t_1,x_1) SINDy_PI_ODE(t_1,x_1,u,Xi,polyorder), tspan(i-1:i,1), x0);
     x_hat(i,:) = x_1(end,:);
     t_hat(i,:) = t_1(end,:);
     x0 = x_hat(i,:)';
@@ -202,48 +211,70 @@ function dx = rational_toy_ODE(t,x,u)
 
 end
 
-function Theta = Theta(X, U)
+function Theta = Theta(X, U, polyorder)
 %     x1 = X(:,1);
 %     x2 = X(:,2);
 %     x3 = X(:,3);
 %     
+%     Poly order =  Highest order of polynomial term in library
 %     Theta = [ones(samples,1), x1, x2, x3, x1.*x2, x1.*x3, x1.^2, x2.^2, x3.^2];
     X = [X, U, sin(X(:,1))];
+    
+    n = size(X,2); % number of pseudo states
+    
+    % Polynomial order 1:
     Theta = [ones(size(X,1),1), X];
-    for i = 1:size(X,2)
-        for j = i:size(X,2)
-            Theta = [Theta, X(:,i).*X(:,j)];
+    
+    % Polynomial order 2:
+    if polyorder >= 2
+        for i = 1:n
+            for j = i:n
+                Theta = [Theta, X(:,i).*X(:,j)];
+            end
+        end
+    end
+    
+    % Polynomial order 3:
+    if polyorder >= 3
+        for i=1:n
+            for j=i:n
+                for k=j:n
+                    Theta = [Theta, X(:,i).*X(:,j).*X(:,k)];
+                end
+            end
         end
     end
     
 end
 
-function x_dot = SINDy_PI_ODE(t, x, u, Xi)
+function x_dot = SINDy_PI_ODE(t, x, u, Xi, polyorder)
     % ODE created by SINDy_PI model defined by Theta and Xi
     % x is column state vector
     % x_dot is column derivative vector
     n = length(x); % Number of states
     
     X = x'; % Row vector fits SINDY format  
-    Theta_X = Theta(X,u); % Calculate library of functions once
+    Theta_X = Theta(X,u,polyorder); % Calculate library of functions once
     X_dot = zeros(size(X)); % Allocate space once
+    
     for i = 1:n % For each state
         xi = Xi(:,i); 
-        xi_num = xi(1:end/2); % Top half of xi for model numerator
-        xi_den = xi(end/2+1:end); % Bottom half of xi for model denomenator
+        xi_num = xi(1:(end/2)); % Top half of xi for model numerator
+        xi_den = xi((end/2+1):end); % Bottom half of xi for model denomenator
+  
         X_dot(:,i) = -(Theta_X*xi_num)./(Theta_X*xi_den);
     end
     
     x_dot = X_dot'; % Back to column vector
 end
 
-function Theta_rm = remove_column(Theta,column)
+function Theta_rm = remove_column(Theta_X,column)
     % Remove the column of Theta given by index: column
-    num_columns = size(Theta,2);
-    Theta_rm = Theta(:,(1:num_columns)~=column);
+    num_columns = size(Theta_X,2);
+    Theta_rm = Theta_X(:,(1:num_columns)~=column);
 end
 
-function Xi = sparsifyDynamics(Theta,dXdt,lambda)
+function Xi = sparsifyDynamics(Theta_X,dXdt,lambda)
     % Copyright 2015, All Rights Reserved
     % Code by Steven L. Brunton
     % For Paper, "Discovering Governing Equations from Data: 
@@ -251,7 +282,7 @@ function Xi = sparsifyDynamics(Theta,dXdt,lambda)
     % by S. L. Brunton, J. L. Proctor, and J. N. Kutz
 
     % compute Sparse regression: sequential least squares
-    Xi = Theta\dXdt;  % initial guess: Least-squares
+    Xi = Theta_X\dXdt;  % initial guess: Least-squares
     Xi_prev = Xi;
     
     % lambda is our sparsification knob.
@@ -261,7 +292,7 @@ function Xi = sparsifyDynamics(Theta,dXdt,lambda)
 
         big_indexes = ~small_indexes;
         % Regress dynamics onto remaining terms to find sparse Xi
-        Xi(big_indexes,:) = Theta(:,big_indexes)\dXdt;
+        Xi(big_indexes,:) = Theta_X(:,big_indexes)\dXdt;
         
         if(Xi == Xi_prev)
             % To save computations, almost by half:
