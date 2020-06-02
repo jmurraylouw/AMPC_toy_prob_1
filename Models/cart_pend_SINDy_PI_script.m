@@ -4,7 +4,7 @@
 
 %% First try with simple system called "system_ODE"
 close all;
-clear all;
+% clear all;
 
 tic;
 
@@ -31,8 +31,8 @@ U = out.u.Data;
 n = size(X,2); % Number of states
 
 % Add noise to measurements
-sigma = 0.0001; % Magnitude of noise (max 0.0001 so far)
-% sigma = 0;
+sigma = 0.001; % Magnitude of noise (max 0.01 so far)
+sigma = 0;
 X       = X + sigma*randn(size(X));
 X_dot   = X_dot + sigma*randn(size(X_dot)); 
 
@@ -78,8 +78,8 @@ for i = 1:n % Loop through all states, i
             % Mertric promotes sparsity
             
             % Plot error vs #terms of all candidate models
-            subplot(2,3,i), semilogy(num_terms,error1, 'x'), hold on;
-            subplot(2,3,i+3), semilogy(num_terms,metric, 'x'), hold on;          
+            subplot(2,n,i), semilogy(num_terms,error1, 'x'), hold on;
+            subplot(2,n,i+n), semilogy(num_terms,metric, 'x'), hold on;          
 
             % ??? Maybe try change to AIC
             
@@ -96,18 +96,13 @@ for i = 1:n % Loop through all states, i
         
     end % End: for each lambda in lambda_list
     
-    % Plot chosen model on error graph
-    y_scale = [1e-5 1];
-    
-    subplot(2,3,i), plot(nnz(best_xi),best_error1, 'o')
+    subplot(2,n,i), plot(nnz(best_xi),best_error1, 'o')
     ylabel('data error');
-    ylim(y_scale);
     grid on;
     hold off;
     
-    subplot(2,3,i+3), plot(nnz(best_xi),min_metric, 'o')
+    subplot(2,n,i+n), plot(nnz(best_xi),min_metric, 'o')
     ylabel('metric');
-    ylim(y_scale);
     grid on;
     hold off;
     
@@ -119,11 +114,43 @@ for i = 1:n % Loop through all states, i
     
 end % End: for each state, i
 
+% Find max/min y scales for scatter plots
+subplot(2,n,1), y_scale = ylim;
+y_max = max(y_scale);
+y_min = min(y_scale);
+for i = 2:n*2
+    subplot(2,n,i), y_scale = ylim;
+    if max(y_scale) > y_max
+        y_max = max(y_scale);
+    end
+    if min(y_scale) < y_min
+        y_min = min(y_scale);
+    end
+end
+
+% Set equal y_scales for scatter plots
+y_min = y_min*1e-1; % Give viewing space before limit
+y_max = y_max*1e1;
+for i = 1:n*2
+    subplot(2,n,i), ylim([y_min y_max]);
+end
+
+for i = 1:n*2
+    subplot(2,n,i), ylim
+end
+
+toc
+
+%% Compare real Xi to model Xi with bar plots
+figure;
+for i = 1:n
+    subplot(1,n,i), bar3([Xi(:,i), real_Xi(:,i)]);
+end
 
 %% Visualise Xi
 x_names = {'x1', 'x2', 'x3', 'u', 'sin(x1)'};
 % x_names = [x_names, {'1'}, x_names];
-vis_Xi = visualize_Xi(x_names, Xi, 2)
+vis_Xi = visualize_Xi(x_names, Xi, 2);
 
 model_errors
 model_lambdas
@@ -144,8 +171,9 @@ U = out.u.Data;
 x_hat(1,:) = x0;
 t_hat(1,:) = 0;
 
+% Solve for small intervals with constant u
 for i=2:size(U,1)
-    [t_1,x_1] = ode113(@(t_1,y_1) SINDy_PI_ODE(t_1,y_1,U(i-1,:),Xi), tspan(i-1:i,1), x0);
+    [t_1,x_1] = ode45(@(t_1,y_1) SINDy_PI_ODE(t_1,y_1,U(i-1,:),Xi), tspan(i-1:i,1), x0);
     x_hat(i,:) = x_1(end,:);
     t_hat(i,:) = t_1(end,:);
     x0 = x_hat(i,:)';
@@ -155,7 +183,6 @@ end
 figure
 plot(tspan,X); hold on;
 plot(t_hat,x_hat,'--', 'LineWidth', 1); hold off;
-
 
 toc; % Display execution time
 
@@ -188,6 +215,7 @@ function Theta = Theta(X, U)
             Theta = [Theta, X(:,i).*X(:,j)];
         end
     end
+    
 end
 
 function x_dot = SINDy_PI_ODE(t, x, u, Xi)
@@ -227,7 +255,7 @@ function Xi = sparsifyDynamics(Theta,dXdt,lambda)
     Xi_prev = Xi;
     
     % lambda is our sparsification knob.
-    for k=1:5
+    for k=1:10
         small_indexes = (abs(Xi)<lambda);   % find small coefficients
         Xi(small_indexes)=0;                % set small coeffs to 0 (threshold)
 
