@@ -4,7 +4,7 @@
 
 %% First try with simple system called "system_ODE"
 close all;
-% clear all;
+clear all;
 
 tic;
 
@@ -13,18 +13,20 @@ tic;
 % Load: x0 and out from simulation
 
 % load('rational_toy_with_input_data_1.mat') % Polyorder = 2
-load('rational_toy_poly3_1.mat') % Polyorder = 3
+% load('rational_toy_poly3_1.mat') % Polyorder = 3
+load('cartpend_data_1')
 
 t = out.tout;
 X = out.x.Data;
 X_dot = out.x_dot.Data; % ??? Change to calculate dx with total variation derivative
 U = out.u.Data;
 
+num_samples = size(X,1); % Number of data samples per state
 n = size(X,2); % Number of states
 
 % Add noise to measurements
-sigma = 0.000001; % Magnitude of noise (max 0.01 so far)
-% sigma = 0;
+sigma = 0.00001; % Magnitude of noise (max 0.01 so far)
+sigma = 0;
 X       = X + sigma*randn(size(X));
 X_dot   = X_dot + sigma*randn(size(X_dot)); 
 
@@ -35,22 +37,24 @@ figure
 
 %% Find best model for each state
 
-polyorder = 3; % Highest order polynomial term in function library
-lambda_list = logspace(-4,-2,20); % List of lambdas to try
-lambda_list = 1e-3;
+polyorder = 2; % Highest order polynomial term in function library
+lambda_list = logspace(-4,-1,10); % List of lambdas to try
+lambda_list = 1e-4;
 
 % Theta to compute function for x_dot
 Theta_X = Theta(X,U,polyorder);
 num_functions = size(Theta_X,2)*2; % Number of funxtions in Theta(x,xdot) library
 
-Xi = []; % Stores final Xi, which each column a xi per state
+Xi = zeros(size(Theta_X,2)*2,n); % Stores final Xi, which each column a xi per state
 model_errors = []; % error of model for each state
 model_lambdas = []; % lambda used for model of each 
 model_column_guess = []; % Column used as guess for model of each state
 
 warning('off','MATLAB:rankDeficientMatrix'); % Do not warn about rank deficiency
+% k_list = zeros(1,n*length(lambda_list)*(size(Theta_i,2)/2+1));
+index = 1;
 
-for i = 1:n % Loop through all states, i
+for i = [2, 4] % Only state 1 and 3 % Loop through all states, i
     Theta_i = [Theta_X, diag(X_dot(:,i))*Theta_X]; % Theta used for x1 only
     
     min_metric = Inf; % Store minimum model 2-norm error
@@ -65,12 +69,15 @@ for i = 1:n % Loop through all states, i
             Theta_rm = remove_column(Theta_i,j); % Remove column being guessed
              
             % sparsifyDynamics hogs the time because of backslash/regression:
-            xi = sparsifyDynamics(Theta_rm,Theta_i(:,j),lambda); % Sequential LS
+            [xi,k_conv] = sparsifyDynamics(Theta_rm,Theta_i(:,j),lambda); % Sequential LS
+            
+%             k_list(index) = k_conv;
+            index = index+1;
             
             % Calculate 2-norm error without test data, penalised for number of parameters
             num_terms = nnz(xi)+1; % Number of non-zero terms in model
             error1 = norm(Theta_i(:,j) - Theta_rm*xi, 1)/norm(Theta_i(:,j),1);
-            metric = error1*num_terms^2; % Metric used to compare candidate models
+            metric = error1*num_terms^3; % Metric used to compare candidate models
             % Mertric promotes sparsity
             
             % Plot error vs #terms of all candidate models
@@ -110,6 +117,13 @@ for i = 1:n % Loop through all states, i
     
 end % End: for each state, i
 
+% Manually add states 1 and 3 
+Xi(3,1) = -1; % x1_dot = x2
+Xi(5,3) = -1; % x3_dot = x4
+
+Xi(end/2+1,1) = 1; % denomenator = 1
+Xi(end/2+1,3) = 1;
+
 % Find max/min y scales for scatter plots
 subplot(2,n,1), y_scale = ylim;
 y_max = max(y_scale);
@@ -132,19 +146,21 @@ for i = 1:n*2
 end
 
 for i = 1:n*2
-    subplot(2,n,i), ylim
+    subplot(2,n,i), ylim;
 end
 
 %% Compare real Xi to model Xi with bar plots
-figure;
-for i = 1:n
-    subplot(1,n,i), bar3([Xi(:,i), real_Xi(:,i)]);
-end
+% figure;
+% for i = 1:n
+%     subplot(1,n,i), bar3([Xi(:,i), real_Xi(:,i)]);
+% end
+
+% histogram(k_list) % Display frequency of values of k where Xi converged
 
 %% Visualise Xi
-x_names = {'x1', 'x2', 'x3', 'u', 'sin(x1)'};
+x_names = {'x1', 'x2', 'x3', 'x4', 'u', 'sin(x3)', 'cos(x3)'};
 % x_names = [x_names, {'1'}, x_names];
-polyorder = 3;
+
 vis_Xi = visualize_Xi(x_names, Xi, polyorder);
 
 model_errors
@@ -159,7 +175,8 @@ toc; % Display computation time
 
 % Load xo, out from a simulation
 % load('rational_toy_with_input_data_2.mat') % Polyorder = 2
-load('rational_toy_poly3_2.mat') % Polyorder = 3
+% load('rational_toy_poly3_2.mat') % Polyorder = 3
+load('cartpend_data_2')
 
 tspan = out.tout;
 X = out.x.Data;
@@ -203,25 +220,25 @@ function dx = rational_toy_ODE(t,x,u)
 
 end
 
-function Theta = Theta(X, U, polyorder)
+function Theta_X = Theta(X, U, polyorder)
 %     x1 = X(:,1);
 %     x2 = X(:,2);
 %     x3 = X(:,3);
 %     
 %     Poly order =  Highest order of polynomial term in library
 %     Theta = [ones(samples,1), x1, x2, x3, x1.*x2, x1.*x3, x1.^2, x2.^2, x3.^2];
-    X = [X, U, sin(X(:,1))];
+    X = [X, U, sin(X(:,3)), cos(X(:,3))];
     
     n = size(X,2); % number of pseudo states
     
     % Polynomial order 1:
-    Theta = [ones(size(X,1),1), X];
+    Theta_X = [ones(size(X,1),1), X];
     
     % Polynomial order 2:
     if polyorder >= 2
         for i = 1:n
             for j = i:n
-                Theta = [Theta, X(:,i).*X(:,j)];
+                Theta_X = [Theta_X, X(:,i).*X(:,j)];
             end
         end
     end
@@ -231,11 +248,13 @@ function Theta = Theta(X, U, polyorder)
         for i=1:n
             for j=i:n
                 for k=j:n
-                    Theta = [Theta, X(:,i).*X(:,j).*X(:,k)];
+                    Theta_X = [Theta_X, X(:,i).*X(:,j).*X(:,k)];
                 end
             end
         end
     end
+    
+    Theta_X = [Theta_X, X(:,4).^2.*sin(X(:,3)), X(:,4).^2.*sin(X(:,3)).*cos(X(:,3))];
     
 end
 
@@ -266,7 +285,7 @@ function Theta_rm = remove_column(Theta_X,column)
     Theta_rm = Theta_X(:,(1:num_columns)~=column);
 end
 
-function Xi = sparsifyDynamics(Theta_X,dXdt,lambda)
+function [Xi,k_conv] = sparsifyDynamics(Theta_X,dXdt,lambda)
     % Copyright 2015, All Rights Reserved
     % Code by Steven L. Brunton
     % For Paper, "Discovering Governing Equations from Data: 
@@ -278,7 +297,8 @@ function Xi = sparsifyDynamics(Theta_X,dXdt,lambda)
     Xi_prev = Xi;
     
     % lambda is our sparsification knob.
-    for k=1:10
+    k_conv = 20; % k at which Xi converges
+    for k=1:k_conv
         small_indexes = (abs(Xi)<lambda);   % find small coefficients
         Xi(small_indexes)=0;                % set small coeffs to 0 (threshold)
 
@@ -289,6 +309,7 @@ function Xi = sparsifyDynamics(Theta_X,dXdt,lambda)
         if(Xi == Xi_prev)
             % To save computations, almost by half:
             % If Xi already converged, then exit loop
+            k_conv = k;
             break;
         end
         Xi_prev = Xi; % Save previous Xi
