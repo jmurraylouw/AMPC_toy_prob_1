@@ -6,7 +6,7 @@
 close all;
 clear all;
 
-tic;
+tic; % Start timer
 
 %% Read Data
 
@@ -25,7 +25,7 @@ num_samples = size(X,1); % Number of data samples per state
 n = size(X,2); % Number of states
 
 % Add noise to measurements
-sigma = 0.00001; % Magnitude of noise (max 0.01 so far)
+sigma = 0.0000001; % Magnitude of noise (max 0.01 so far)
 sigma = 0;
 X       = X + sigma*randn(size(X));
 X_dot   = X_dot + sigma*randn(size(X_dot)); 
@@ -38,8 +38,8 @@ figure
 %% Find best model for each state
 
 polyorder = 2; % Highest order polynomial term in function library
-lambda_list = logspace(-4,-1,10); % List of lambdas to try
-lambda_list = 1e-4;
+lambda_list = logspace(-6,-5,5); % List of lambdas to try
+% lambda_list = 1e-4;
 
 % Theta to compute function for x_dot
 Theta_X = Theta(X,U,polyorder);
@@ -53,7 +53,11 @@ model_column_guess = []; % Column used as guess for model of each state
 warning('off','MATLAB:rankDeficientMatrix'); % Do not warn about rank deficiency
 % k_list = zeros(1,n*length(lambda_list)*(size(Theta_i,2)/2+1));
 index = 1;
-
+guess_list = 1:1:size(Theta_X,2);
+guess_list = guess_list(guess_list~=1);
+guess_list = guess_list(guess_list~=34); % Remove sin^2 because trig identity give false low error
+guess_list = guess_list(guess_list~=35);
+guess_list = guess_list(guess_list~=36); % Remove cos^2
 for i = [2, 4] % Only state 1 and 3 % Loop through all states, i
     Theta_i = [Theta_X, diag(X_dot(:,i))*Theta_X]; % Theta used for x1 only
     
@@ -62,9 +66,16 @@ for i = [2, 4] % Only state 1 and 3 % Loop through all states, i
     best_column = Inf; % Store best guess of column
     best_xi = []; % Store best xi for model
    
+    color_list = {'b.', 'g.', 'k.', 'm.', 'r.', 'y.'...
+        'bx', 'gx', 'kx', 'mx', 'rx', 'yx'...
+        'b+', 'g+', 'k+', 'm+', 'r+', 'y+'}; % Range of colors to use
+    
+    color_index = 1; % Index of next color to use
     for lambda = lambda_list % Test each lambda in list
+        color = color_list{color_index}; % New color for each lambda
+        color_index = color_index + 1; % Next color index
         tic_lambda=tic();
-        for j = 1:1:size(Theta_i,2)/2+1 % Guess a column in Theta (only for numerator)
+        for j = guess_list % Guess a column in Theta (only for numerator)
 
             Theta_rm = remove_column(Theta_i,j); % Remove column being guessed
              
@@ -76,13 +87,16 @@ for i = [2, 4] % Only state 1 and 3 % Loop through all states, i
             
             % Calculate 2-norm error without test data, penalised for number of parameters
             num_terms = nnz(xi)+1; % Number of non-zero terms in model
-            error1 = norm(Theta_i(:,j) - Theta_rm*xi, 1)/norm(Theta_i(:,j),1);
-            metric = error1*num_terms^3; % Metric used to compare candidate models
+            % ??? this error of regression, not of model, can give false
+            % low error, like with a trig identity cos^2 + sin^2 = 1
+            error = norm(Theta_i(:,j) - Theta_rm*xi, 1)/norm(Theta_i(:,j),1);
+            
+            metric = error*num_terms^3; % Metric used to compare candidate models
             % Mertric promotes sparsity
             
             % Plot error vs #terms of all candidate models
-            subplot(2,n,i), semilogy(num_terms,error1, 'x'), hold on;
-            subplot(2,n,i+n), semilogy(num_terms,metric, 'x'), hold on;          
+            subplot(2,n,i), semilogy(num_terms,error, color, 'MarkerSize', 8), hold on;
+            subplot(2,n,i+n), semilogy(num_terms,metric, color, 'MarkerSize', 8), hold on;          
 
             % ??? Maybe try change to AIC
             
@@ -90,7 +104,7 @@ for i = [2, 4] % Only state 1 and 3 % Loop through all states, i
             if metric < min_metric
                 best_xi = [xi(1:j-1); -1; xi(j:end)];  % Insert -1 into position j for removed column of Theta
                 min_metric = metric; % Update min_error value
-                best_error1 = error1; % Save 2-norm error of original data
+                best_error1 = error; % Save 2-norm error of original data
                 best_lambda = lambda; % Store lambda value used for this column
                 best_column = j; % Store column used for this guess
             end
@@ -117,12 +131,20 @@ for i = [2, 4] % Only state 1 and 3 % Loop through all states, i
     
 end % End: for each state, i
 
+%%
 % Manually add states 1 and 3 
 Xi(3,1) = -1; % x1_dot = x2
 Xi(5,3) = -1; % x3_dot = x4
 
-Xi(end/2+1,1) = 1; % denomenator = 1
+Xi(end/2+1,1) = 1; % Add denominator = 1
 Xi(end/2+1,3) = 1;
+
+% If SINDy-PI added no terms to denominator, add them
+for i = 1:n
+    if nnz(Xi((end/2+1):end,i)) == 0 % If no terms in denominator
+        Xi((end/2+1),i) = 1; % Add denominator = 1
+    end
+end
 
 % Find max/min y scales for scatter plots
 subplot(2,n,1), y_scale = ylim;
@@ -150,10 +172,11 @@ for i = 1:n*2
 end
 
 %% Compare real Xi to model Xi with bar plots
-% figure;
-% for i = 1:n
-%     subplot(1,n,i), bar3([Xi(:,i), real_Xi(:,i)]);
-% end
+load('cartpend_real_Xi_and_params')
+figure;
+for i = 1:n
+    subplot(1,n,i), bar3([Xi(:,i), real_Xi(:,i)]);
+end
 
 % histogram(k_list) % Display frequency of values of k where Xi converged
 
@@ -163,6 +186,7 @@ x_names = {'x1', 'x2', 'x3', 'x4', 'u', 'sin(x3)', 'cos(x3)'};
 
 vis_Xi = visualize_Xi(x_names, Xi, polyorder);
 
+lambda_list
 model_errors
 model_lambdas
 model_column_guess % Guessed column of Theta that worked best
@@ -173,7 +197,7 @@ toc; % Display computation time
 %% Validatation
 % Run model on new data and compare to actual measurements
 
-% Load xo, out from a simulation
+% Load x0, out from a simulation
 % load('rational_toy_with_input_data_2.mat') % Polyorder = 2
 % load('rational_toy_poly3_2.mat') % Polyorder = 3
 load('cartpend_data_2')
@@ -315,3 +339,5 @@ function [Xi,k_conv] = sparsifyDynamics(Theta_X,dXdt,lambda)
         Xi_prev = Xi; % Save previous Xi
     end
 end
+
+
