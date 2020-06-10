@@ -12,9 +12,9 @@ vis_Xi(2:end, 3:end) = num2cell(Xi); % Insert Xi into vis_Xi
 rows = size(Xi,1); % Number of rows in Xi/ states
 cols = size(Xi,2); % Number of columns in Xi/ terms
 
-for i = 1:cols % Add column headers of states
-    vis_Xi(1,i+2) = strcat(x_names(i),'_dot');
-end
+% for i = 1:cols % Add column headers of states
+%     vis_Xi(1,i+2) = strcat(x_names(i),'_dot');
+% end
 
 vis_Xi(2,2) = {'1'};
 index = 3; % Row index to add next label
@@ -47,8 +47,8 @@ if(polyorder>=3)
 end
 
 % assert(index-2 == rows, 'There are %d rows in Xi, but only %d combinations of terms',rows,index-2 )
-if(index-2 ~= rows) % Add denominator terms
-    vis_Xi(((end-1)/2+1+1):end,2) = vis_Xi(2:((end-1)/2+1),2);
-end
+% if(index-2 ~= rows) % Add denominator terms
+%     vis_Xi(((end-1)/2+1+1):end,2) = vis_Xi(2:((end-1)/2+1),2);
+% end
 
 vis_Xi(:,1) = num2cell((0:size(vis_Xi,1)-1)'); % Add row numbering
