@@ -57,15 +57,15 @@ tau = 1; % Sample number shift of delay cordinates.
 assert(samples+delays*tau <= N); %% otherwise index out of bounds 
 
 % Step 1: Collect and construct the snapshot matrices:
-X = []; % Augmented state with delay coordinates [Y(k); Y(k-1*tau); Y(k-2*tau); ...]
+H = []; % Augmented state with delay coordinates [Y(k); Y(k-1*tau); Y(k-2*tau); ...]
 for i = 1:tau:delays*tau
-    X = [y_data(:, i:samples+i); X];  
+    H = [y_data(:, i:samples+i); H];  
 end
 
-n = size(X)*[1; 0]; % Length of augmented state vector
+n = size(H,1); % Length of augmented state vector
 
-X2 = X(:, 2:end); % Y advanced 1 step into future
-X = X(:, 1:end-1); % Cut off last sample
+X2 = H(:, 2:end); % Y advanced 1 step into future
+X = H(:, 1:end-1); % Cut off last sample
 
 Upsilon = u_data(:, (delays*tau):(samples + delays*tau - 1)); % Upsilon
 
@@ -128,7 +128,7 @@ x_data_cut = x_data(:,delays*tau:end);
 x_hat = run_model(A,B,u_data,t_cut,x_hat_0);
 
 plot(t_cut, x_data_cut)
-pause
+
 hold on;
 plot(t_cut, x_hat(1:2,:), '--');
 hold off;

@@ -90,6 +90,7 @@ pause
 end
 figure
 semilogy(num_delays_list,MSE)
+
 %%
 
 function dx = toy_ODE(t,x)
@@ -98,7 +99,7 @@ function dx = toy_ODE(t,x)
     k=15;
     dx = [
             x(2);
-            -b/m*x(2) - k/m*x(1); % Non-linear spring
+            -b/m*x(2) - k/m*x(1); % Linear spring
     ];
 end
 
