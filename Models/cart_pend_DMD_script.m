@@ -1,44 +1,36 @@
-%% DMD - Moving-Window of cart pendulum
+%% DMDc - Moving-Window of cart pendulum
 % Estimate System matrixes with moving window of data in real time
 % Partial state feedback
 
 %% Variables for simulation
-x0 = [0; 0; 0; 0];
+x0 = [1; 0; -0.2; -0.8];
 
 %% Read data
+load('cartpend_data_3.mat') % Load training data
 u_data  = out.u.Data';
 x_data  = out.x.Data';
-I = eye(4);
-y_data  = I([1, 3],:)*out.x.Data'; % Measure x and theta
 
-% y_data  = out.y.Data';
-t       = out.tout';
-
-Ts      = t(2)-t(1);     % Sample time of data
-
-% Cut out transient time period
-u_data = u_data(:, 10/Ts:end);
-x_data = x_data(:, 10/Ts:end);
-y_data = y_data(:, 10/Ts:end);
-t      = t(:, 10/Ts:end);
-
-N       = max(size(x_data)); % Number of data samples
-
-% Load saved data from memory
-% load('C:\Users\Murray\OneDrive - Stellenbosch University\Masters\AMPC_toy_prob_1\Data\cart_pend_square_wave_response.mat')
+n = size(x_data)*[1; 0]; % number of states
+I = eye(n);
+y_data  = I([1, 3],:)*x_data; % Measure x and theta
 
 n = size(x_data)*[1; 0]; % number of states
 m = size(y_data)*[1; 0]; % number of measurements
 l = size(u_data)*[1; 0]; % number of inputs
 
+t  = out.tout';
+Ts = t(2)-t(1);     % Sample time of data
 
-%% Batch DMDc - Partial state feedback
+N  = length(t); % Number of data samples
+plot(t,x_data)
+
+%% HAVOK - Partial state feedback
 % Augment y with time delay coordinates of y
 
 % Very dependant on choice of delays, p, r
 
-samples = 30/Ts;
-delays = 10; % Number of delay cordinates, including y_data(1:samples+1)
+samples = N*0.8;
+delays = 20; % Number of delay cordinates, including y_data(1:samples+1)
 tau = 1; % Sample number shift of delay cordinates.
 % Noticed error increased for increasing tau
 % i.e Y = y(k)      y(k+1)      y(k+2)...
@@ -67,7 +59,7 @@ Omega = [X; Upsilon]; % Omega is concatination of Y and Upsilon
 
 % plot(diag(S), 'o')
 p = min(size(V)) % Reduced rank of Omega svd
-p=9
+p = 9
 U_tilde = U(:, 1:p); % Truncate SVD matrixes of Omega
 S_tilde = S(1:p, 1:p);
 V_tilde = V(:, 1:p);
@@ -137,127 +129,6 @@ MSE_dmdc = mean(((x_data_cut(1,:) - x_hat(1,:)).^2)')'
 %%
 stop
 
-
-
-% %% Batch DMD - Full state feedback, no truncation
-% X = x_data(:, 1:end-1);
-% X2 = x_data(:, 2:end);
-% Upsilon = u_data(:, 1:end-1); % Upsilon
-% % X2 = A*X + B*U
-% % X2 = [A, B]*[X; U]
-% 
-% G = X2/[X; Upsilon];
-% A = G(:, 1:nx);
-% B = G(:, nx+1:end);
-% 
-% x_hat_data = plot_model(A,B,u_data,t,x0);
-% hold on;
-% plot(t, x_data, '--')
-% hold on;
-% 
-% MSE_dmd = mean(((x_data-x_hat_data).^2)')'
-
-%% Analytic system
-
-A_c = [0, 1; -k/m, -b/m];
-B_c = [0; 1/m];
-C_c = [1 0];
-D_c = 0;
-sys_c = ss(A_c,B_c,C_c,D_c);
-sys_d = c2d(sys_c, Ts);
-[A_d,B_d,C_d,D_d] = ssdata(sys_d);
-
-%% Plot and compare analytic to DMD model
-x_hat_data = plot_model(A_d,B_d,u_data,t,x0);
-plot(t, x_data-x_hat_data)
-MSE_analytic = mean(((x_data-x_hat_data).^2)')'
-
-%% Moving window
-% Initialise
-A_output = zeros(2,2);
-B_output = zeros(2,1);
-
-X_dwork = zeros(2,w);
-U_dwork = zeros(1,w);
-
-% plot(t, x_data, 'k'); hold on; % Plot measured x vs t
-
-a11=zeros(1,N-1);
-MSE = zeros(1,N-1);
-
-incr = 1;%/Ts; % Increment size for data plots
-for k = 1:incr:N-1
-    % Inport Dwork memory
-    X = X_dwork;
-    Upsilon = U_dwork;
-    
-    % Inputs
-    x       = x_data(k);
-    u       = u_data(k);
-    
-    % Add input data to X2
-    X2 = [X(:, 2:end), [x_dot; x]];
-   
-    % Based on DMD control example video by Steve Brunton
-    XU = [X; Upsilon];
-    G = X2*pinv(XU);
-    A  = G(:,1:2);
-    B  = G(:,end);
-    
-    % Check for change in model
-    w_c = 20; % window of data points to check for change in system model
-    
-    % Take only last w_c entries of X and X2
-    X2_measured = X2(:, (end-w_c+1):end);
-    X_measured  = X(:, (end-w_c+1):end);
-    
-    % Calculate X2 according to A
-    X2_calc = A*X_measured;
-    MSE(k) = mean((X2_measured - X2_calc).^2, 'all');
-    
-    a11(k) = A(1,1);
-    
-    % Output
-    A_output = A;
-    B_output = B;
-    
-    % Update Dwork memory
-    X_dwork = X2;
-    U_dwork = [Upsilon(:, 2:end), u];
-    
-end
-
-C = [0 1];
-D = 0;
-
-t = 1:1:N-1;
-plot(t,a11);
-hold on;
-plot(t,MSE)
-
-% plot_model(A,B,f_data,t,2)
-% hold on;
-% [A,B,C,D] = ssdata(mpc1.Model.Plant)
-% plot_model(A,B,U_data,t,2)
-
-
-A = [0.969169519504925  -0.246386829627017;  0.049277365925403  0.993808202467626];
-B = [0.049277365925403; 0.001238359506475];
-
-%%
-
-% Extract nx, ny, nu
-size_B = size(B);
-n = size_B(1);
-l = size_B(2);
-size_C = size(C);
-m = size_C(1);
-
-% Create nominal point at all 0, because linear model.
-X = zeros(n,1);
-X = zeros(m,1);
-Upsilon = zeros(l,1);
-DX = [0; 0];
 
 %% Local functions
 function X_hat = plot_model(A,B,U_data,t,x0)
