@@ -19,10 +19,23 @@ Ts = t(2)-t(1);     % Sample time of data
 N  = length(t); % Number of data samples
 
 % Add noise
-sigma = 0.001;
+sigma = 0.01;
 y_data = y_data + sigma*randn(size(y_data));
 plot(t,y_data)
-
+y_data = smoothdata(y_data,2,'gaussian');
+figure, plot(t,y_data)
+% % Denoise (FFT: youtube.com/watch?v=c249W6uc7ho)
+% f_hat = fft(y_noise(1,:),N);
+% PSD = f_hat.*conj(f_hat)/N;
+% freq = 1/(Ts*N)*(0:N);
+% L = 1:floor(N/2);
+% % figure, plot(freq(L), PSD(L))
+% 
+% indices = PSD > 1;
+% f_hat = indices.*f_hat; % Zero out all small PSD frequencies
+% y_filt = ifft(f_hat); % Filtered signal
+% figure, plot(t,y_filt)
+% figure, plot(t,y_data-y_filt)
 %%
 % Validation data
 load('cartpend_data_4.mat') % Load validation data
@@ -44,8 +57,8 @@ samples = floor(N*0.2);
 p = 12; % Truncated rank of system
 c = 2; % Column spacing of Hankel matrix
 d = 2; % Row spacing of Hankel matrix
-q = 800; % number of delays
-w = 1600; % (named 'p' in Multiscale paper) number of columns in Hankel matrix
+q = 900; % number of delays
+w = 2000; % (named 'p' in Multiscale paper) number of columns in Hankel matrix
 
 numel_H = q*m*w
 time_predict = 6e-6*numel_H
@@ -119,20 +132,22 @@ if (sum(abs(eig(A)) > 1) ~= 0) % If some eigenvalues are unstable due to machine
 end
 
 % If some eigenvalues are unstable due to machine tolerance,
-% % Scale them to be stable
-% count = 0;
-% while (sum(abs(eig(A)) > 1) ~= 0) 
-%     count=count+1
-%     [Ve,De] = eig(A);
-%     unstable = abs(De)>1; % indexes of unstable eigenvalues
-%     De(unstable) = De(unstable)./abs(De(unstable)) - 10^(-10+count); % Normalize all unstable eigenvalues (set abs(eig) = 1)
-%     A = Ve*De*inv(Ve); % New A with margininally stable eigenvalues
-%     if(count>10)
-%         'break'
-%         break
-%     end
-% end
-% assert(sum(abs(eig(A)) > 1) == 0, 'Unstable eigenvalues'); % Check if all eigenvalues are stable (magnitude <= 1)
+% Scale them to be stable
+count = 0;
+while (sum(abs(eig(A)) > 1) ~= 0) 
+    count = count+1
+    [Ve,De] = eig(A);
+    unstable = abs(De)>1; % indexes of unstable eigenvalues
+    De(unstable) = De(unstable)./abs(De(unstable)) - 10^(-16+count); % Normalize all unstable eigenvalues (set abs(eig) = 1)
+    A = Ve*De*inv(Ve); % New A with margininally stable eigenvalues
+    A_old = A;
+    A = real(A);
+    if(count>10)
+        'break'
+        break
+    end
+end
+assert(sum(abs(eig(A)) > 1) == 0, 'Unstable eigenvalues'); % Check if all eigenvalues are stable (magnitude <= 1)
 
 % x_augmented(k+1) = A*x_aug(k) + B*u(k)
 
@@ -152,7 +167,7 @@ X_hat(:,k_start) = x_hat_0; % Initial conditions, insert at first k
 for k = (row*d + 1):N_valid-1
     X_hat(:,k+1) = A*X_hat(:,k) + B*u_valid(k);
 end
-%%
+
 x_hat = X_hat(end-m+1:end, :); % Extract only non-delay time series (last m rows)
 
 toc;
@@ -166,6 +181,8 @@ ylim([-4 7]) % Set equal ylim for comparison
 plot([D D], ylim, 'r')
 legend('x', 'theta', 'input', 'x_hat', 'theta_hat', 'D')
 hold off;
+
+ave_diff = mean(abs((x_valid(1,k_start:end) - x_hat(1,k_start:end))))
 
 %% Compare to training data
 disp(6)
@@ -197,7 +214,7 @@ plot([t(final_sample) t(final_sample)], ylim, 'k')
 legend('x', 'theta', 'input', 'x_hat', 'theta_hat', 'D', 't(final sample)')
 hold off
 
-ave_diff = mean(abs((x_valid(1,k_start:end) - x_hat(1,k_start:end))))
+
 RMSE_matrix(q,r) = ave_diff;
 
 
