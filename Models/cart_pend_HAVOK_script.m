@@ -19,7 +19,7 @@ Ts = t(2)-t(1);     % Sample time of data
 N  = length(t); % Number of data samples
 
 % Add noise
-sigma = 0.01;
+sigma = 0.1;
 y_data = y_data + sigma*randn(size(y_data));
 plot(t,y_data)
 y_data = smoothdata(y_data,2,'gaussian');
@@ -54,7 +54,7 @@ samples = floor(N*0.2);
 % [X_p,Y_delays] = meshgrid(1:delays(end), 1:delays(end)); % Values for surface plot
 % RMSE_matrix = zeros(delays(end), delays(end)); % Empty matrix of errors
 
-p = 12; % Truncated rank of system
+p = 8; % Truncated rank of system
 c = 2; % Column spacing of Hankel matrix
 d = 2; % Row spacing of Hankel matrix
 q = 900; % number of delays
@@ -70,7 +70,7 @@ D = (q-1)*d*Ts; % Delay duration
 for q = q % Loop through delays
     for p = p % Loop truncateed rank
 
-r = p-l; % Reduced rank of X2 svd, r < p, (minus number of inputs from rank)
+r = p-1; % Reduced rank of X2 svd, r < p, (minus number of inputs from rank)
 tic;
 % Noticed error increased for increasing tau
 % i.e Y = y(k)      y(k+1)      y(k+2)...
