@@ -1,4 +1,4 @@
-%% Discrete SINDY - Moving-Window of non-linear mass spring damper
+%% Discrete SINDY - non-linear mass spring damper
 % Estimate non-linear system model with moving window 
 % of data from non-linear mass spring damper
 % Full-state feedback
@@ -8,24 +8,24 @@
 clear all;
 
 %% Generate Data
-x0 = [-1; 0.1];  % Initial condition
+x0 = [-1; -0.1; 2];  % Initial condition
 n = length(x0);  % Number of states
 tspan = 0:0.01:20;
 
 % Trainging data
 % options = odeset('RelTol',1e-12,'AbsTol',1e-12*ones(1,n));
-ode = @toy_ODE;
+ode = @rational_toy_ODE;
 [t,x] = ode45(@(t,x) ode(t,x), tspan, x0);
 
 % Add noise
 
-lambda = 0.001; % lambda is our sparsification knob.
+lambda = 0.01; % lambda is our sparsification knob.
 sigma  = 0.01;
 x = x + sigma*rand(size(x));
 figure(1), plot(t,x);
 pause
 % Validation data
-x0_valid = [2; 2];
+x0_valid = [0.2; -0.22; 0.1];
 tspan_valid = [0:0.01:40];
 % options = odeset('RelTol',1e-12,'AbsTol',1e-12*ones(1,n));
 [t_valid,x_valid] = ode45(@(t,x) ode(t,x), tspan_valid, x0_valid);
@@ -49,7 +49,7 @@ for num_delays = num_delays_list
     end
     
     Xi = [];
-    Theta_X = poolData(x_extended,polyorder);  % up to third order polynomials
+    Theta_X = Theta(x_extended,polyorder, num_delays);  % up to third order polynomials
     for i = 1:n
         Xi(:,i) = sparsifyDynamics(Theta_X,X2(:,i),lambda);
     end
@@ -74,7 +74,7 @@ for num_delays = num_delays_list
         for i = 0:num_delays
             x_extended = [x_extended, x_hat(k-i,:)];
         end
-        Theta_X = poolData(x_extended,polyorder);
+        Theta_X = Theta(x_extended,polyorder, num_delays);
         x_hat(k+1,:) = Theta_X*Xi;
     end
 
@@ -101,6 +101,57 @@ function dx = toy_ODE(t,x)
             x(2);
             -b/m*x(2) - k/m*x(1); % Linear spring
     ];
+end
+
+function dx = rational_toy_ODE(t,x)
+    % 2 states
+    x1 = x(1,:);
+    x2 = x(2,:);
+    x3 = x(3,:);
+    
+    dx = [
+            3*x3 - x2.^2;
+            (-sin(x1)  - x2 + 2*x1.*x3);
+            (x1.*x2 - 3*x3)
+    ];
+
+end
+
+function Theta_X = Theta(X, polyorder, delays)
+%     x1 = X(:,1);
+%     x2 = X(:,2);
+%     x3 = X(:,3);
+%     
+%     Poly order =  Highest order of polynomial term in library
+%     Theta = [ones(samples,1), x1, x2, x3, x1.*x2, x1.*x3, x1.^2, x2.^2, x3.^2];
+    for k = 0:delays % Add extra function for each of delays coordinates
+        X = [X, sin(X(:,3*k+1)), cos(X(:,3*k+1))];
+    end
+    n = size(X,2); % number of pseudo states
+    
+    % Polynomial order 1:
+    Theta_X = [ones(size(X,1),1), X];
+    
+    % Polynomial order 2:
+    if polyorder >= 2
+        for i = 1:n
+            for j = i:n
+                Theta_X = [Theta_X, X(:,i).*X(:,j)];
+            end
+        end
+    end
+    
+    % Polynomial order 3:
+    if polyorder >= 3
+        for i=1:n
+            for j=i:n
+                for k=j:n
+                    Theta_X = [Theta_X, X(:,i).*X(:,j).*X(:,k)];
+                end
+            end
+        end
+    end
+        
 end
 
 function xi = sparsifyDynamics(Theta_X,x2,lambda)

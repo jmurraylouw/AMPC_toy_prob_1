@@ -7,23 +7,24 @@
 load('cartpend_data_3.mat') % Load training data
 u_data  = out.u.Data';
 x_data  = out.x.Data';
-plot(t,x_data)
-n = size(x_data)*[1; 0]; % number of states
+
+n = size(x_data,1); % number of states
 I = eye(n);
-y_data  = I([1, 3],:)*x_data; % Measure x and theta
-n = size(x_data)*[1; 0]; % number of states
-m = size(y_data)*[1; 0]; % number of measurements
-l = size(u_data)*[1; 0]; % number of inputs
+C = I([1,3],:); % Measurement matrix
+y_data  = C*x_data; % Measure x and theta
+n = size(x_data,1); % number of states
+m = size(y_data,1); % number of measurements
+l = size(u_data,1); % number of inputs
 t  = out.tout';
 Ts = t(2)-t(1);     % Sample time of data
 N  = length(t); % Number of data samples
 
 % Add noise
-sigma = 0.1;
+sigma = 0.001;
 y_data = y_data + sigma*randn(size(y_data));
 plot(t,y_data)
-y_data = smoothdata(y_data,2,'gaussian');
-figure, plot(t,y_data)
+% y_data = smoothdata(y_data,2,'gaussian');
+% figure, plot(t,y_data)
 % % Denoise (FFT: youtube.com/watch?v=c249W6uc7ho)
 % f_hat = fft(y_noise(1,:),N);
 % PSD = f_hat.*conj(f_hat)/N;
@@ -41,31 +42,30 @@ figure, plot(t,y_data)
 load('cartpend_data_4.mat') % Load validation data
 u_valid  = out.u.Data';
 x_valid  = out.x.Data';
-I = eye(n);
-y_valid  = I([1, 3],:)*x_valid; % Measure x and theta
+y_valid  = C*x_valid; % Measure x and theta
 t_valid  = out.tout';
 Ts_valid = t_valid(2)-t_valid(1); % Sample time of data
 N_valid = length(t_valid); % Number of data samples in validation data
-% Very dependant on choice of delays, p, r, q
 
-samples = floor(N*0.2);
-% delays = 1; % Number of delay cordinates, including y_data(1:samples+1)
-% p = 1; % Reduced rank of Omega svd
 % [X_p,Y_delays] = meshgrid(1:delays(end), 1:delays(end)); % Values for surface plot
 % RMSE_matrix = zeros(delays(end), delays(end)); % Empty matrix of errors
 
-p = 8; % Truncated rank of system
-c = 2; % Column spacing of Hankel matrix
-d = 2; % Row spacing of Hankel matrix
-q = 900; % number of delays
-w = 2000; % (named 'p' in Multiscale paper) number of columns in Hankel matrix
+% Very dependant on choice of delays, p, r, q
+p = 11; % Truncated rank of system
+c = 1; % Column spacing of Hankel matrix
+d = 1; % Row spacing of Hankel matrix
+q = 500; % number of delays
+w = 1500; % (named 'p' in Multiscale paper) number of columns in Hankel matrix
 
-numel_H = q*m*w
+numel_H = q*m*w;
+log10(numel_H)
 time_predict = 6e-6*numel_H
 
 final_sample = (q-1)*d + (w-1)*c + 2; % Last sample used in Hankel matrix
 assert(final_sample <= N, 'Not enough data. Change q, d, w, or c'); % otherwise index out of bounds 
 D = (q-1)*d*Ts; % Delay duration
+
+%%
 
 for q = q % Loop through delays
     for p = p % Loop truncateed rank
@@ -172,7 +172,7 @@ x_hat = X_hat(end-m+1:end, :); % Extract only non-delay time series (last m rows
 
 toc;
 
-figure, plot(t_valid, x_valid([1, 3],:)) 
+figure, plot(t_valid, y_valid) 
 title('Validation data vs Model')
 hold on;
 plot(t_valid, u_valid, ':', 'LineWidth', 1)

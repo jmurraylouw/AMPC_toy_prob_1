@@ -3,7 +3,7 @@
 % github.com/dynamicslab/SINDy-PI
 
 %% First try with simple system called "system_ODE"
-close all;
+% close all;
 clear all;
 
 tic; % Start timer
@@ -14,31 +14,78 @@ tic; % Start timer
 
 % load('rational_toy_with_input_data_1.mat') % Polyorder = 2
 % load('rational_toy_poly3_1.mat') % Polyorder = 3
-load('cartpend_data_1')
+load('cartpend_data_3')
 
 t = out.tout;
+Ts = t(2) - t(1);
 X = out.x.Data;
 X_dot = out.x_dot.Data; % ??? Change to calculate dx with total variation derivative
 U = out.u.Data;
-
 num_samples = size(X,1); % Number of data samples per state
 n = size(X,2); % Number of states
 
 % Add noise to measurements
-sigma = 0.0000001; % Magnitude of noise (max 0.01 so far)
-sigma = 0;
+sigma   = 0.01; % Magnitude of noise
 X       = X + sigma*randn(size(X));
-X_dot   = X_dot + sigma*randn(size(X_dot)); 
+
+%% Total Variation Regularized Differentiation
+% Implementation of TVRegDiff from the publication "Sparse identification of nonlinear dynamics for model predictive control in the low-data limit" by E. Kaiser, J. N. Kutz and S. L. Brunton.
+
+for alpha = 5*10.^2
+X_dot_clean = zeros(size(X)+[1 0]);
+for i = 1:size(X,2)
+    tic
+    X_dot_clean(:,i) = TVRegDiff( X(:,i), 10, alpha, [], 'small', 1e6, Ts, 0, 0 ); %.00002
+    toc
+end
+% Because 'small' adds extra entry:
+X_dot_clean = X_dot_clean(2:end,:);
+
+f=1;
+figure
+plot(t,X_dot(:,f)); hold on
+plot(t,X_dot_clean(:,f)); hold off
+% plot(t,smoothdata(X_dot2(:,f),'SmoothingFactor',0.0)); hold off
+
+end
+% 
+for f=1:4
+plot(t,X_dot(:,f)); hold on
+plot(t,X_dot_clean(:,f)); hold off
+pause
+end
+
+% Use integral of X_dot_clean for X_clean
+X_clean = zeros(size(X));
+for i = 1:size(X,2)
+    X_clean(:,i) = X_clean(1,i) + cumtrapz(t, X_dot_clean(:,i)); % Numeric integration
+    X_clean(:,i) = X_clean(:,i) - (mean(X_clean(50:end-50,i)) - mean(X(50:end-50,i))); % Adjust mean
+end
+X_clean = X_clean(50:end-51,:);
+X_dot_clean = X_dot_clean(50:end-51,:);  % trim off ends (overly conservative)
+% 
+tc = t(50:end-51);
+for f=1:4
+plot(t,X(:,f)); hold on
+plot(tc,X_clean(:,f)); hold off
+pause
+end
+
+% Use denoised data
+X = X_clean;
+X_dot = X_dot_clean;
+U = U(50:end-51);
+t = t(50:end-51);
 
 % Plot measurements
 plot(t,X);
 title("Training data");
 figure
-
+stop
 %% Find best model for each state
 
 polyorder = 2; % Highest order polynomial term in function library
-lambda_list = logspace(-6,-5,5); % List of lambdas to try
+lambda_list = logspace(-3,-1,4); % List of lambdas to try
 % lambda_list = 1e-4;
 
 % Theta to compute function for x_dot
@@ -58,6 +105,8 @@ guess_list = guess_list(guess_list~=1);
 guess_list = guess_list(guess_list~=34); % Remove sin^2 because trig identity give false low error
 guess_list = guess_list(guess_list~=35);
 guess_list = guess_list(guess_list~=36); % Remove cos^2
+guess_list = 8;
+
 for i = [2, 4] % Only state 1 and 3 % Loop through all states, i
     Theta_i = [Theta_X, diag(X_dot(:,i))*Theta_X]; % Theta used for x1 only
     
@@ -81,7 +130,7 @@ for i = [2, 4] % Only state 1 and 3 % Loop through all states, i
              
             % sparsifyDynamics hogs the time because of backslash/regression:
             [xi,k_conv] = sparsifyDynamics(Theta_rm,Theta_i(:,j),lambda); % Sequential LS
-            
+            xi = Theta_rm\Theta_i(:,j);
 %             k_list(index) = k_conv;
             index = index+1;
             
@@ -172,7 +221,7 @@ for i = 1:n*2
 end
 
 %% Compare real Xi to model Xi with bar plots
-load('cartpend_real_Xi_and_params')
+load('cartpend_real_Xi')
 figure;
 for i = 1:n
     subplot(1,n,i), bar3([Xi(:,i), real_Xi(:,i)]);
@@ -184,7 +233,7 @@ end
 x_names = {'x1', 'x2', 'x3', 'x4', 'u', 'sin(x3)', 'cos(x3)'};
 % x_names = [x_names, {'1'}, x_names];
 
-vis_Xi = visualize_Xi(x_names, Xi, polyorder);
+vis_Xi = visualize_Xi(x_names, Xi, polyorder)
 
 lambda_list
 model_errors
@@ -200,13 +249,14 @@ toc; % Display computation time
 % Load x0, out from a simulation
 % load('rational_toy_with_input_data_2.mat') % Polyorder = 2
 % load('rational_toy_poly3_2.mat') % Polyorder = 3
-load('cartpend_data_2')
+load('cartpend_data_4')
 
 tspan = out.tout;
 X = out.x.Data;
 U = out.u.Data;
 
 % Generate data with SINDY-PI model
+x0 = X(1,:);
 x_hat(1,:) = x0;
 t_hat(1,:) = 0;
 
@@ -229,6 +279,11 @@ disp('Total execution time')
 toc; % Display total execution time
 
 warning('on','MATLAB:rankDeficientMatrix'); % Switch on warning for other scripts
+
+% Maximise figures
+for i=1:4
+    figure(i), set(gcf,'units','normalized','outerposition',[0 0 1 1]);
+end
 
 function dx = rational_toy_ODE(t,x,u)
     % 2 states
