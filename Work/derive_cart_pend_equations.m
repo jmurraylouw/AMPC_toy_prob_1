@@ -21,8 +21,8 @@ L = (KE_M + KE_m) - (PE_M + PE_m);
 L = simplify(L);
 
 % Equation from Lagraungian, with regards to x
-eq_x        = euler_lag(L, x,       u,  t); % eq_x == 0
-eq_theta    = euler_lag(L, theta,   -d*diff(theta,t), t);
+eq_x        = euler_lag(L, x,       u-d*xdot,  t); % eq_x == 0
+eq_theta    = euler_lag(L, theta,   0, t);
 
 eq_x        = simplify(eq_x);
 eq_theta    = simplify(eq_theta);
@@ -40,11 +40,11 @@ new = [y(2),    y(4)];
 xdotdot = subs(xdotdot, old, new);
 thetadotdot = subs(thetadotdot, old, new);
 
-xdotdot = subs(xdotdot, x, y(1));
-xdotdot = subs(xdotdot, theta, y(3));
+xdotdot = simplifyFraction(subs(xdotdot, x, y(1)));
+xdotdot = simplifyFraction(subs(xdotdot, theta, y(3)));
 
-thetadotdot = subs(thetadotdot, x, y(1));
-thetadotdot = subs(thetadotdot, theta, y(3));
+thetadotdot = simplifyFraction(subs(thetadotdot, x, y(1)));
+thetadotdot = simplifyFraction(subs(thetadotdot, theta, y(3)));
 
 thetadotdot
 xdotdot
