@@ -15,6 +15,7 @@ tic; % Start timer
 % load('rational_toy_with_input_data_1.mat') % Polyorder = 2
 % load('rational_toy_poly3_1.mat') % Polyorder = 3
 load('cartpend_data_3')
+load('cartpend_real_Xi') % Load value for Xi that works
 
 t = out.tout;
 Ts = t(2) - t(1);
@@ -25,63 +26,66 @@ num_samples = size(X,1); % Number of data samples per state
 n = size(X,2); % Number of states
 
 % Add noise to measurements
-sigma   = 0.01; % Magnitude of noise
+sigma   = 0.001; % Magnitude of noise
 X       = X + sigma*randn(size(X));
 
 %% Total Variation Regularized Differentiation
 % Implementation of TVRegDiff from the publication "Sparse identification of nonlinear dynamics for model predictive control in the low-data limit" by E. Kaiser, J. N. Kutz and S. L. Brunton.
+denoise = 1;
+if(denoise)
+    alpha = 7*10.^1
+    X_dot_clean = zeros(size(X)+[1 0]);
+    for i = 1:size(X,2)
+        tic
+        X_dot_clean(:,i) = TVRegDiff( X(:,i), 10, alpha, [], 'small', 1e6, Ts, 0, 0 ); %.00002
+        toc
+    end
+    % Because 'small' adds extra entry:
+    X_dot_clean = X_dot_clean(2:end,:);
 
-for alpha = 5*10.^2
-X_dot_clean = zeros(size(X)+[1 0]);
-for i = 1:size(X,2)
-    tic
-    X_dot_clean(:,i) = TVRegDiff( X(:,i), 10, alpha, [], 'small', 1e6, Ts, 0, 0 ); %.00002
-    toc
+    % Use integral of X_dot_clean for X_clean
+    X_clean = zeros(size(X));
+    for i = 1:size(X,2)
+        X_clean(:,i) = X_clean(1,i) + cumtrapz(t, X_dot_clean(:,i)); % Numeric integration
+        X_clean(:,i) = X_clean(:,i) - (mean(X_clean(50:end-50,i)) - mean(X(50:end-50,i))); % Adjust mean
+    end
+    X_clean = X_clean(50:end-51,:);
+    X_dot_clean = X_dot_clean(50:end-51,:);  % trim off ends (overly conservative)
+    % 
+    % tc = t(50:end-51);
+    % f=1;
+    % for f=1:4
+    % subplot(1,2,1), plot(t,X_dot(:,f)); hold on
+    % plot(tc,X_dot_clean(:,f)); hold off
+    % title('X dot')
+    % legend('measured', 'clean')
+    % subplot(1,2,2), plot(t,X(:,f)); hold on
+    % plot(tc,X_clean(:,f)); hold off
+    % title('X')
+    % legend('measured', 'clean')
+    % pause
+    % end
+
+    % Use denoised data
+    X = X_clean;
+    X_dot = X_dot_clean;
+    U = U(50:end-51);
+    t = t(50:end-51);
 end
-% Because 'small' adds extra entry:
-X_dot_clean = X_dot_clean(2:end,:);
 
-f=1;
-figure
-plot(t,X_dot(:,f)); hold on
-plot(t,X_dot_clean(:,f)); hold off
-% plot(t,smoothdata(X_dot2(:,f),'SmoothingFactor',0.0)); hold off
 
-end
-% 
-for f=1:4
-plot(t,X_dot(:,f)); hold on
-plot(t,X_dot_clean(:,f)); hold off
-pause
-end
+% Choose window size for training data
+window = 5000;
+X = X(1:window,:);
+X_dot = X_dot(1:window,:);
+U = U(1:window,:);
+t = t(1:window,:);
 
-% Use integral of X_dot_clean for X_clean
-X_clean = zeros(size(X));
-for i = 1:size(X,2)
-    X_clean(:,i) = X_clean(1,i) + cumtrapz(t, X_dot_clean(:,i)); % Numeric integration
-    X_clean(:,i) = X_clean(:,i) - (mean(X_clean(50:end-50,i)) - mean(X(50:end-50,i))); % Adjust mean
-end
-X_clean = X_clean(50:end-51,:);
-X_dot_clean = X_dot_clean(50:end-51,:);  % trim off ends (overly conservative)
-% 
-tc = t(50:end-51);
-for f=1:4
-plot(t,X(:,f)); hold on
-plot(tc,X_clean(:,f)); hold off
-pause
-end
-
-% Use denoised data
-X = X_clean;
-X_dot = X_dot_clean;
-U = U(50:end-51);
-t = t(50:end-51);
-
-% Plot measurements
-plot(t,X);
+% Plot data
+figure(1), plot(t,X);
 title("Training data");
-figure
-stop
+drawnow;
+
 %% Find best model for each state
 
 polyorder = 2; % Highest order polynomial term in function library
@@ -90,7 +94,7 @@ lambda_list = logspace(-3,-1,4); % List of lambdas to try
 
 % Theta to compute function for x_dot
 Theta_X = Theta(X,U,polyorder);
-num_functions = size(Theta_X,2)*2; % Number of funxtions in Theta(x,xdot) library
+num_functions = size(Theta_X,2)*2; % Number of functions in Theta(x,xdot) library
 
 Xi = zeros(size(Theta_X,2)*2,n); % Stores final Xi, which each column a xi per state
 model_errors = []; % error of model for each state
@@ -105,7 +109,7 @@ guess_list = guess_list(guess_list~=1);
 guess_list = guess_list(guess_list~=34); % Remove sin^2 because trig identity give false low error
 guess_list = guess_list(guess_list~=35);
 guess_list = guess_list(guess_list~=36); % Remove cos^2
-guess_list = 8;
+guess_list = [3,6, 7];
 
 for i = [2, 4] % Only state 1 and 3 % Loop through all states, i
     Theta_i = [Theta_X, diag(X_dot(:,i))*Theta_X]; % Theta used for x1 only
@@ -123,15 +127,23 @@ for i = [2, 4] % Only state 1 and 3 % Loop through all states, i
     for lambda = lambda_list % Test each lambda in list
         color = color_list{color_index}; % New color for each lambda
         color_index = color_index + 1; % Next color index
-        tic_lambda=tic();
+        tic_lambda = tic();
         for j = guess_list % Guess a column in Theta (only for numerator)
 
             Theta_rm = remove_column(Theta_i,j); % Remove column being guessed
              
             % sparsifyDynamics hogs the time because of backslash/regression:
-            [xi,k_conv] = sparsifyDynamics(Theta_rm,Theta_i(:,j),lambda); % Sequential LS
-            xi = Theta_rm\Theta_i(:,j);
+%             [xi,k_conv] = sparsifyDynamics(Theta_rm,Theta_i(:,j),lambda); % Sequential LS
 %             k_list(index) = k_conv;
+            xi = Theta_rm\Theta_i(:,j);          
+            full_xi = [xi(1:j-1); -1; xi(j:end)];
+            full_xi = full_xi./sum(full_xi)
+            figure(2), bar3([full_xi, real_Xi(:,i)./sum(real_Xi(:,i))])
+            i
+            lambda
+            j
+            
+            pause
             index = index+1;
             
             % Calculate 2-norm error without test data, penalised for number of parameters
@@ -144,8 +156,9 @@ for i = [2, 4] % Only state 1 and 3 % Loop through all states, i
             % Mertric promotes sparsity
             
             % Plot error vs #terms of all candidate models
-            subplot(2,n,i), semilogy(num_terms,error, color, 'MarkerSize', 8), hold on;
-            subplot(2,n,i+n), semilogy(num_terms,metric, color, 'MarkerSize', 8), hold on;          
+            
+            figure(3), subplot(2,n,i), semilogy(num_terms,error, color, 'MarkerSize', 8), hold on;
+            figure(3), subplot(2,n,i+n), semilogy(num_terms,metric, color, 'MarkerSize', 8), hold on;          
 
             % ??? Maybe try change to AIC
             
@@ -162,12 +175,12 @@ for i = [2, 4] % Only state 1 and 3 % Loop through all states, i
         
     end % End: for each lambda in lambda_list
     
-    subplot(2,n,i), plot(nnz(best_xi),best_error1, 'o')
+    figure(3), subplot(2,n/2,i/2), plot(nnz(best_xi),best_error1, 'o')
     ylabel('data error');
     grid on;
     hold off;
     
-    subplot(2,n,i+n), plot(nnz(best_xi),min_metric, 'o')
+    figure(3), subplot(2,n/2,(i+n)/2), plot(nnz(best_xi),min_metric, 'o')
     ylabel('metric');
     grid on;
     hold off;
@@ -223,8 +236,10 @@ end
 %% Compare real Xi to model Xi with bar plots
 load('cartpend_real_Xi')
 figure;
-for i = 1:n
-    subplot(1,n,i), bar3([Xi(:,i), real_Xi(:,i)]);
+index = 2;
+for i = 1:2
+    subplot(1,2,i), bar3([Xi(:,index), real_Xi(:,index)]);
+    index = index + 2;
 end
 
 % histogram(k_list) % Display frequency of values of k where Xi converged
@@ -251,19 +266,26 @@ toc; % Display computation time
 % load('rational_toy_poly3_2.mat') % Polyorder = 3
 load('cartpend_data_4')
 
-tspan = out.tout;
-X = out.x.Data;
-U = out.u.Data;
+t_valid = out.tout;
+X_valid = out.x.Data;
+U_valid = out.u.Data;
+
+% Only use portion of data
+t_valid = t_valid(1:window,:);
+X_valid = X_valid(1:window,:);
+U_valid = U_valid(1:window,:);
 
 % Generate data with SINDY-PI model
-x0 = X(1,:);
+x0 = X_valid(1,:);
+x_hat = zeros(window,n);
+t_hat = zeros(window,1);
 x_hat(1,:) = x0;
 t_hat(1,:) = 0;
 
 % Solve for small intervals with constant u
-for i=2:size(U,1)
-    u = (U(i-1,:)+U(i,:))/2; % Assume constant u at average of time interval
-    [t_1,x_1] = ode45(@(t_1,x_1) SINDy_PI_ODE(t_1,x_1,u,Xi,polyorder), tspan(i-1:i,1), x0);
+for i=2:size(U_valid,1)
+    u = (U_valid(i-1,:)+U_valid(i,:))/2; % Assume constant u at average of time interval
+    [t_1,x_1] = ode45(@(t_1,x_1) SINDy_PI_ODE(t_1,x_1,u,Xi,polyorder), t_valid(i-1:i,1), x0);
     x_hat(i,:) = x_1(end,:);
     t_hat(i,:) = t_1(end,:);
     x0 = x_hat(i,:)';
@@ -271,7 +293,7 @@ end
 
 % PLot simulation data vs model data
 figure
-plot(tspan,X); hold on;
+plot(t_valid,X_valid); hold on;
 plot(t_hat,x_hat,'--', 'LineWidth', 1); hold off;
 title('Validation data vs Model');
 
@@ -300,12 +322,8 @@ function dx = rational_toy_ODE(t,x,u)
 end
 
 function Theta_X = Theta(X, U, polyorder)
-%     x1 = X(:,1);
-%     x2 = X(:,2);
-%     x3 = X(:,3);
-%     
-%     Poly order =  Highest order of polynomial term in library
-%     Theta = [ones(samples,1), x1, x2, x3, x1.*x2, x1.*x3, x1.^2, x2.^2, x3.^2];
+    %  Poly order =  Highest order of polynomial term in library
+    %   Theta = [ones(samples,1), x1, x2, x3, x1.*x2, x1.*x3, x1.^2, x2.^2, x3.^2];
     X = [X, U, sin(X(:,3)), cos(X(:,3))];
     
     n = size(X,2); % number of pseudo states
@@ -378,7 +396,11 @@ function [Xi,k_conv] = sparsifyDynamics(Theta_X,dXdt,lambda)
     % lambda is our sparsification knob.
     k_conv = 20; % k at which Xi converges
     for k=1:k_conv
-        small_indexes = (abs(Xi)<lambda);   % find small coefficients
+        % lambda is a fraction of the largest value in the model which
+        % is considered significant
+        % Change from original lambda
+        threshold = lambda*max(Xi);
+        small_indexes = (abs(Xi)<threshold);   % find small coefficients
         Xi(small_indexes)=0;                % set small coeffs to 0 (threshold)
 
         big_indexes = ~small_indexes;

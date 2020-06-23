@@ -47,8 +47,8 @@ if(polyorder>=3)
 end
 
 % assert(index-2 == rows, 'There are %d rows in Xi, but only %d combinations of terms',rows,index-2 )
-% if(index-2 ~= rows) % Add denominator terms
-%     vis_Xi(((end-1)/2+1+1):end,2) = vis_Xi(2:((end-1)/2+1),2);
-% end
+if(index-2 ~= rows) % Add denominator terms
+    vis_Xi(((end-1)/2+1+1):end,2) = vis_Xi(2:((end-1)/2+1),2);
+end
 
 vis_Xi(:,1) = num2cell((0:size(vis_Xi,1)-1)'); % Add row numbering
