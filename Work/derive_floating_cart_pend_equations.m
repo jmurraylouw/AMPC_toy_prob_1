@@ -33,7 +33,7 @@ PE_M = -M*g*z; % Potential energy of drone body
 
 % Payload equations
 x_m = x + L*sin(theta); % x position of payload
-z_m = -L*cos(theta);    % z position of payload
+z_m = z - L*cos(theta); % z position of payload
 
 KE_m = 0.5*m*( diff(x_m,t)^2 + diff(z_m,t)^2 ); % Kinetic energy of payload
 PE_m = -m*g*z_m; % Potential energy of payload
@@ -96,13 +96,21 @@ xdotdot     = subs(xdotdot, old, new);
 zdotdot     = subs(zdotdot, old, new);
 thetadotdot = subs(thetadotdot, old, new);
 
-%% Display system equations
+%% Display to copy
+xdotdot
+zdotdot
+thetadotdot
+
+%% Display pretty equations
 'xdotdot'
 pretty(xdotdot)
 'zdotdot'
 pretty(zdotdot)
 'thetadotdot'
 pretty(thetadotdot)
+
+
+
 
 % dy(1,1) = y(2);
 % dy(2,1) = double(xdotdot);

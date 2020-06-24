@@ -4,6 +4,7 @@ function dx = floating_pendulum_2D(t,x,u,params)
     %   dx = derivative of state vector
     %   u  = input vector [fx; fz]
     %   params = parameter vector
+%     x0 = [0.5; 1; -0.2; -0.3; 0.2; 1]
 
     M  = params(1); % mass of base at pivot of pendulum
     m  = params(2); % mass of payload at end of pendulum
@@ -18,13 +19,16 @@ function dx = floating_pendulum_2D(t,x,u,params)
     Sin = sin(x(3)); % Compute once to save computations
     Cos = cos(x(3)); 
     
+    fx = u(1);
+    fz = u(2);
+    
     dx = zeros(6,1);
     dx(1,1) = x(4); % x_dot
     dx(2,1) = x(5); % z_dot
     dx(3,1) = x(6); % theta_dot
-    dx(4,1) = (L*fx + ct*x(6)*Cos - L*cx*x(4) + L^2*m*x(6)^2*Sin - L*g*m*Cos*Sin)/(L*(- m*Cos^2 + M + m)); % x_dotdot
-    dx(5,1) = (fz + M*g - cz*x(5))/M; % z_dotdot
-    dx(6,1) = -(M*ct*x(6) + ct*m*x(6) + L*fx*m*Cos - L*g*m^2*Sin + L^2*m^2*x(6)^2*Cos*Sin - L*M*g*m*Sin - L*cx*m*x(4)*Cos)/(L^2*m*(- m*Cos^2 + M + m)); % theta_dotdot
+    dx(4,1) = (M*ct*x(6)*Cos + ct*m*x(6)*Cos + L*M*fx*Cos^2 + L*M*fx*Sin^2 + L*fx*m*Cos^2 - L*M*cx*x(4)*Cos^2 - L*M*cx*x(4)*Sin^2 - L*cx*m*x(4)*Cos^2 + L*fz*m*Cos*Sin + L^2*M*m*x(6)^2*Sin^3 - L*cz*m*x(5)*Cos*Sin + L^2*M*m*x(6)^2*Cos^2*Sin)/((M + m)*(L*M*Cos^2 + L*M*Sin^2)); % x_dotdot
+    dx(5,1) = (L*M^2*g*Sin^2 + M*ct*x(6)*Sin + ct*m*x(6)*Sin + L*M*fz*Cos^2 + L*M*fz*Sin^2 + L*fz*m*Sin^2 + L*M^2*g*Cos^2 + L*M*g*m*Cos^2 - L*M*cz*x(5)*Cos^2 + L*M*g*m*Sin^2 - L*M*cz*x(5)*Sin^2 - L*cz*m*x(5)*Sin^2 + L*fx*m*Cos*Sin - L^2*M*m*x(6)^2*Cos^3 - L*cx*m*x(4)*Cos*Sin - L^2*M*m*x(6)^2*Cos*Sin^2)/((M + m)*(L*M*Cos^2 + L*M*Sin^2)); % z_dotdot
+    dx(6,1) = -(M*ct*x(6) + ct*m*x(6) + L*fx*m*Cos + L*fz*m*Sin - L*cx*m*x(4)*Cos - L*cz*m*x(5)*Sin)/(m*(M*L^2*Cos^2 + M*L^2*Sin^2)); % theta_dotdot
     
 end
 
