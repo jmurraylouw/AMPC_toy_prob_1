@@ -24,13 +24,21 @@ N  = length(t);     % Number of data samples
 % RMSE_matrix = zeros(delays(end), delays(end)); % Empty matrix of errors
 
 %% Parameters
-% Very dependant on choice of delays, p, r, q
-p = 80; % Truncated rank of system
+% Very dependant on choice of p, r, q
+p = 40; % Truncated rank of system
 c = 1; % Column spacing of Hankel matrix
 d = 1; % Row spacing of Hankel matrix
-q = 1500; % number of delays
-w = 3000; % (named 'p' in Multiscale paper) number of columns in Hankel matrix
+q = 1000; % number of delays
+w = 2000; % (named 'p' in Multiscale paper) number of columns in Hankel matrix
 sigma = 0.001; % Noise standard deviation
+
+% Working for:
+% p = 80; % Truncated rank of system
+% c = 1; % Column spacing of Hankel matrix
+% d = 1; % Row spacing of Hankel matrix
+% q = 1000; % number of delays
+% w = 2000; % (named 'p' in Multiscale paper) number of columns in Hankel matrix
+% sigma = 0.01; % Noise standard deviation
 
 numel_H = q*m*w;
 log10(numel_H)
@@ -84,7 +92,7 @@ disp(2)
 figure, semilogy(diag(S), 'x'), hold on;
 title('Singular values of Omega, showing p truncation')
 plot(p,S(p,p), 'ro'), hold off;
-figure
+% figure, % Plot columns of V
 % for i=1:20    
 %     plot(V(:,i));
 %     pause
@@ -209,6 +217,18 @@ toc;
 % RMSE_matrix(q,r) = ave_diff;
     end
 end
+
+%% Save data
+havok_results = model_results(RMSE, sigma, y_hat, y_test, u_test, t_test, y_train, u_train, t_train, y_data, u_data, t, C);
+
+havok_results.A = A; % System matrix
+havok_results.B = B;% Input matrix
+havok_results.p = p;
+havok_results.r = r;
+havok_results.c = c;
+havok_results.d = d;
+havok_results.q = q;
+havok_results.w = w;
 
 % Map errors of different hyperparameters
 % surf(X_p,Y_delays,abs(RMSE_matrix))
