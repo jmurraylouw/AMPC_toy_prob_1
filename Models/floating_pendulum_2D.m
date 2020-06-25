@@ -4,7 +4,7 @@ function dx = floating_pendulum_2D(t,x,u,params)
     %   dx = derivative of state vector
     %   u  = input vector [fx; fz]
     %   params = parameter vector
-%     x0 = [0.5; 1; -0.2; -0.3; 0.2; 1]
+%     x0 = [0.5; 6; -0.2; -0.8; -1; 1]
 
     M  = params(1); % mass of base at pivot of pendulum
     m  = params(2); % mass of payload at end of pendulum
