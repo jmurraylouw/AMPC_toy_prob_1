@@ -23,13 +23,14 @@ N  = length(t);     % Number of data samples
 % [X_p,Y_delays] = meshgrid(1:delays(end), 1:delays(end)); % Values for surface plot
 % RMSE_matrix = zeros(delays(end), delays(end)); % Empty matrix of errors
 
+%% Parameters
 % Very dependant on choice of delays, p, r, q
 p = 80; % Truncated rank of system
 c = 1; % Column spacing of Hankel matrix
 d = 1; % Row spacing of Hankel matrix
 q = 1500; % number of delays
 w = 3000; % (named 'p' in Multiscale paper) number of columns in Hankel matrix
-sigma = 0; % Noise standard deviation
+sigma = 0.001; % Noise standard deviation
 
 numel_H = q*m*w;
 log10(numel_H)
@@ -142,6 +143,8 @@ if (sum(abs(eig(A)) > 1) ~= 0) % If some eigenvalues are unstable due to machine
     disp('Still unstable eigenvalues')
 end
 
+disp('Model computed')
+toc;
 % x_augmented(k+1) = A*x_aug(k) + B*u(k)
 
 % Ignore eigenmodes Step 5 and 6
@@ -163,6 +166,10 @@ end
 
 y_hat = Y_hat(end-m+1:end, :); % Extract only non-delay time series (last m rows)
 
+% Vector of Root Mean Squared Error on testing data
+RMSE = sqrt(sum((y_hat - y_test).^2, 2)./N_test) % Each row represents RMSE for measured state
+
+disp('Run model on testing data')
 toc;
 
 %% Compare to training data
@@ -180,6 +187,9 @@ for k = k_start:N_train-1
     Y_hat2(:,k+1) = A*Y_hat2(:,k) + B*u_train(:,k);
 end
 y_hat2 = Y_hat2(end-m+1:end, :); % Extract only non-delay time series (last m rows)
+
+disp('Run model on training data')
+toc;
 
 %% Plot data vs model
 figure;
