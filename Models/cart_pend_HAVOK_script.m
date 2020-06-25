@@ -23,20 +23,7 @@ N  = length(t); % Number of data samples
 sigma = 0.001;
 y_data = y_data + sigma*randn(size(y_data));
 plot(t,y_data)
-% y_data = smoothdata(y_data,2,'gaussian');
-% figure, plot(t,y_data)
-% % Denoise (FFT: youtube.com/watch?v=c249W6uc7ho)
-% f_hat = fft(y_noise(1,:),N);
-% PSD = f_hat.*conj(f_hat)/N;
-% freq = 1/(Ts*N)*(0:N);
-% L = 1:floor(N/2);
-% % figure, plot(freq(L), PSD(L))
-% 
-% indices = PSD > 1;
-% f_hat = indices.*f_hat; % Zero out all small PSD frequencies
-% y_filt = ifft(f_hat); % Filtered signal
-% figure, plot(t,y_filt)
-% figure, plot(t,y_data-y_filt)
+
 %%
 % Validation data
 load('cartpend_data_4.mat') % Load validation data
