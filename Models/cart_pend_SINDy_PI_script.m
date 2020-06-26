@@ -13,19 +13,23 @@ tic; % Start timer
 
 % load('rational_toy_with_input_data_1.mat') % Polyorder = 2
 % load('rational_toy_poly3_1.mat') % Polyorder = 3
-load('cartpend_data_3');
+% load('cartpend_data_3');
 load('cartpend_real_Xi'); % Load value for Xi that works
+load('cartpend_random_1');
 
 t = out.tout;
 Ts = t(2) - t(1);
 X = out.x.Data;
 X_dot = out.x_dot.Data; % ??? Change to calculate dx with total variation derivative
 U = out.u.Data;
-num_samples = size(X,1); % Number of data samples per state
+N = size(X,1); % Number of data samples per state
 n = size(X,2); % Number of states
 
+% Parameters
+N_train = 8000;
+sigma   = 0.0000; % Standard deviation of noise
+
 % Add noise to measurements
-sigma   = 0.000; % Magnitude of noise
 X       = X + sigma*randn(size(X));
 
 %% Total Variation Regularized Differentiation
@@ -72,13 +76,12 @@ X       = X + sigma*randn(size(X));
 %     t = t(50:end-51);
 % end
 
-
 % Choose window size for training data
-window = 5000;
-X = X(1:window,:);
-X_dot = X_dot(1:window,:);
-U = U(1:window,:);
-t = t(1:window,:);
+
+X = X(1:N_train,:);
+X_dot = X_dot(1:N_train,:);
+U = U(1:N_train,:);
+t = t(1:N_train,:);
 
 % Plot data
 figure(1), plot(t,X);
@@ -88,7 +91,7 @@ title("Training data");
 %% Find best model for each state
 
 polyorder = 2; % Highest order polynomial term in function library
-lambda_list = logspace(-3,-1,4); % List of lambdas to try
+lambda_list = logspace(-6,-1,5); % List of lambdas to try
 % lambda_list = 1e-4;
 
 % Theta to compute function for x_dot
@@ -104,6 +107,8 @@ warning('off','MATLAB:rankDeficientMatrix'); % Do not warn about rank deficiency
 % k_list = zeros(1,n*length(lambda_list)*(size(Theta_i,2)/2+1));
 index = 1;
 guess_list = 1:1:size(Theta_X,2);
+dont_guess = [24,25]; % Row indices not to guess during regression
+guess_list = guess_list(~ismember(guess_list,dont_guess)); % Remove indices of dont_guess
 % guess_list = guess_list(guess_list~=1);
 % guess_list = guess_list(guess_list~=34); % Remove sin^2 because trig identity give false low error
 % guess_list = guess_list(guess_list~=35);
@@ -132,7 +137,7 @@ for i = [2, 4] % Only state 1 and 3 % Loop through all states, i
             Theta_rm = remove_column(Theta_i,j); % Remove column being guessed
              
 %             sparsifyDynamics hogs the time because of backslash/regression:
-            [xi,k_conv] = sparsifyDynamics(Theta_rm,Theta_i(:,j),lambda); % Sequential LS
+            [xi,k_conv] = sparsify_dynamics(Theta_rm,Theta_i(:,j),lambda); % Sequential LS
 %             k_list(index) = k_conv;
 %             xi = Theta_rm\Theta_i(:,j);          
 %             full_xi = [xi(1:j-1); -1; xi(j:end)];
@@ -268,14 +273,14 @@ X_valid = out.x.Data;
 U_valid = out.u.Data;
 
 % Only use portion of data
-t_valid = t_valid(1:window,:);
-X_valid = X_valid(1:window,:);
-U_valid = U_valid(1:window,:);
+t_valid = t_valid(1:N_train,:);
+X_valid = X_valid(1:N_train,:);
+U_valid = U_valid(1:N_train,:);
 
 % Generate data with SINDY-PI model
 x0 = X_valid(1,:);
-x_hat = zeros(window,n);
-t_hat = zeros(window,1);
+x_hat = zeros(N_train,n);
+t_hat = zeros(N_train,1);
 x_hat(1,:) = x0;
 t_hat(1,:) = 0;
 
@@ -354,6 +359,7 @@ function Theta_X = Theta(X, U, polyorder)
     Theta_X = [Theta_X, cos(X(:,3)).^2];
     Theta_X = [Theta_X, sin(X(:,3))];
     Theta_X = [Theta_X, X(:,4).^2.*sin(X(:,3)).*cos(X(:,3))];
+    Theta_X = [Theta_X, X(:,2).*cos(X(:,3))];
     Theta_X = [Theta_X, cos(X(:,3)).*U];
     
 end
@@ -385,7 +391,7 @@ function Theta_rm = remove_column(Theta_X,column)
     Theta_rm = Theta_X(:,(1:num_columns)~=column);
 end
 
-function [Xi,k_conv] = sparsifyDynamics(Theta_X,dXdt,lambda)
+function [Xi,k_conv] = sparsify_dynamics(Theta_X,dXdt,lambda)
     % Copyright 2015, All Rights Reserved
     % Code by Steven L. Brunton
     % For Paper, "Discovering Governing Equations from Data: 
@@ -477,6 +483,8 @@ function vis_Xi = visualize_Xi(x_names, Xi, polyorder)
     vis_Xi{index,2} = ['(sinx3)'];
     index = index+1;
     vis_Xi{index,2} = ['(x4^2)(sinx3)(cosx3)'];
+    index = index+1;
+    vis_Xi{index,2} = ['(x2)(cosx3)'];
     index = index+1;
     vis_Xi{index,2} = ['(cosx3)(u)'];
     index = index+1;
