@@ -13,8 +13,8 @@ tic; % Start timer
 
 % load('rational_toy_with_input_data_1.mat') % Polyorder = 2
 % load('rational_toy_poly3_1.mat') % Polyorder = 3
-load('cartpend_data_3')
-load('cartpend_real_Xi') % Load value for Xi that works
+load('cartpend_data_3');
+load('cartpend_real_Xi'); % Load value for Xi that works
 
 t = out.tout;
 Ts = t(2) - t(1);
@@ -25,7 +25,7 @@ num_samples = size(X,1); % Number of data samples per state
 n = size(X,2); % Number of states
 
 % Add noise to measurements
-sigma   = 0.001; % Magnitude of noise
+sigma   = 0.000; % Magnitude of noise
 X       = X + sigma*randn(size(X));
 
 %% Total Variation Regularized Differentiation
@@ -74,7 +74,7 @@ X       = X + sigma*randn(size(X));
 
 
 % Choose window size for training data
-window = 3000;
+window = 5000;
 X = X(1:window,:);
 X_dot = X_dot(1:window,:);
 U = U(1:window,:);
@@ -103,7 +103,7 @@ model_column_guess = []; % Column used as guess for model of each state
 warning('off','MATLAB:rankDeficientMatrix'); % Do not warn about rank deficiency
 % k_list = zeros(1,n*length(lambda_list)*(size(Theta_i,2)/2+1));
 index = 1;
-% guess_list = 1:1:size(Theta_X,2);
+guess_list = 1:1:size(Theta_X,2);
 % guess_list = guess_list(guess_list~=1);
 % guess_list = guess_list(guess_list~=34); % Remove sin^2 because trig identity give false low error
 % guess_list = guess_list(guess_list~=35);
@@ -347,13 +347,14 @@ function Theta_X = Theta(X, U, polyorder)
             end
         end
     end
-    
-    columns = size(Theta_X,2); % Number of function columns in Theta
-    for i = 1:columns
-        Theta_X = [Theta_X, Theta_X(:,i).*sin(X(:,3)), Theta_X(:,i).*cos(X(:,3))]
-    end
-    
-    Theta_X = [Theta_X, X(:,4).^2.*sin(X(:,3)).*cos(X(:,3)), cos(X(:,3)).^2];
+        
+    % Add extra functions
+    Theta_X = [Theta_X, sin(X(:,3)).*cos(X(:,3))];
+    Theta_X = [Theta_X, X(:,4).^2.*sin(X(:,3))];
+    Theta_X = [Theta_X, cos(X(:,3)).^2];
+    Theta_X = [Theta_X, sin(X(:,3))];
+    Theta_X = [Theta_X, X(:,4).^2.*sin(X(:,3)).*cos(X(:,3))];
+    Theta_X = [Theta_X, cos(X(:,3)).*U];
     
 end
 
@@ -466,18 +467,24 @@ function vis_Xi = visualize_Xi(x_names, Xi, polyorder)
             end
         end
     end
-
-    columns = index-1; % Number of function columns in Theta
-    for i = 2:columns
-        vis_Xi{index,2} = [vis_Xi{i,2},{'sin'}];
-        vis_Xi{index+1,2} = [vis_Xi{i,2},{'cos'}];
-        index = index+2;
-    end
     
-    vis_Xi{index,2} = {'sin(x3)*cos(x3)*x4^2'};
+    vis_Xi{index,2} = ['(sinx3)(cosx3)'];
     index = index+1;
-    vis_Xi{index,2} = {'cos(x3)^2'};
-    Theta_X = [Theta_X, X(:,4).^2.*sin(X(:,3)).*cos(X(:,3)), cos(X(:,3)).^2];
+    vis_Xi{index,2} = ['(x4^2)(sinx3)'];
+    index = index+1;
+    vis_Xi{index,2} = ['(cosx3)^2'];
+    index = index+1;
+    vis_Xi{index,2} = ['(sinx3)'];
+    index = index+1;
+    vis_Xi{index,2} = ['(x4^2)(sinx3)(cosx3)'];
+    index = index+1;
+    vis_Xi{index,2} = ['(cosx3)(u)'];
+    index = index+1;
+    
+    num_funcs = size(Xi,1);
+    
+    vis_Xi((floor(end/2)+2):end, 2) = vis_Xi(2:(floor(end/2)+1), 2); % Add same labels from numerator to denomenator
 
+    
     vis_Xi(:,1) = num2cell((0:size(vis_Xi,1)-1)'); % Add row numbering
 end
