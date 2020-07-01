@@ -184,9 +184,16 @@ function Start(block)
     x_hat = x_hat + f(x_hat,u)*Ts; % Numeric integration to extrapolate state
 
     Phi = eye(nx) + F*Ts + 1/2*(F*Ts)^2; % ??? where is this from? 2nd order Taylor expansion? (continuous to discrete)
-Q
+
     P = Phi*P*Phi' + Q; % Extrapolate uncertainty
 
+    % Enforce positive parameters constraint
+    min_param = 0.01; % Min allowable param value
+    if nx > 4 % If paramters are estimated
+        for i = 5:nx 
+            x_hat(i) = max(x_hat(i), min_param);
+        end
+    end
     % Assign to memory/Dwork
     block.Dwork(1).Data = x_hat;
     block.Dwork(2).Data = reshape(P, 1, nx*nx);

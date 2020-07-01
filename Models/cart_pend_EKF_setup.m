@@ -11,14 +11,14 @@ g = @measure; % Measurement function handle
 % Initialise
 % x = [x, x_dot, theta, theta_dot, L, m, d]
 x0 = [0; 0; 0; 0];
-x_guess = [0; 0; 0; 0; 2];
+x_guess = [0; 0; 0; 0; 2; 4; 1; 5];
 nx = length(x_guess); % 4 states, 3 paramters
 ny = length(g(x_guess)); % x and theta
-P0 = diag([0; 0.00001; 0; 0.00001; 0.1]);
 u0 = 0;
 nu = length(u0);
 
-Q = diag([0; 0.00001; 0; 0.00001; 0.00001]); % Model uncertainty
+P0 = diag([0; 0.00001; 0; 0.00001; 0.01; 0.01; 0.01; 0.01]); % Initial guess uncertainty
+Q = diag([0; 0.00001; 0; 0.00001; 0.00005; 0.00005; 0.00005; 0.00005]); % Model uncertainty
 R = 0.001*eye(ny); % Measurement uncertainty
 
 
@@ -35,20 +35,15 @@ function dx = cartpend(x,u)
 %     M;]
 
 % Parameters
-m = 2;% x(6); % 2 actual value
-M = 4; % 4
-L = x(5); % 1
+m = x(5); % 2 actual value
+M = x(6); %4; % 4
+L = x(7); % 1
 g = -9.81;
-d = 5; % x(7); % 5
+d = x(8); % 5
 
 Sx = sin(x(3));
 Cx = cos(x(3));
 D = m*L*L*(M+m*(1-Cx^2));
-
-D_min = 1e-5;
-if D < D_min
-    D = D_min;
-end
 
 nx = length(x);
 

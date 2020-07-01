@@ -31,10 +31,10 @@ sigma = 0.1;
 y_train = y_train + sigma*randn(size(y_train));
 
 % Actual parameters
-m = 2*ones(1,N); % Mass of payload
-M = 4*ones(1,N); % Mass of cart
-L = 1*ones(1,N); % Length of pendulum
-d = 5*ones(1,N); % Linear damping coef on cart
+m = 2; % Mass of payload
+M = 4; % Mass of cart
+L = 1; % Length of pendulum
+d = 5; % Linear damping coef on cart
 
 % Dimensions
 nx = size(x_data,1); % number of states
@@ -99,7 +99,7 @@ end
 plot_rows = [1,2,3,4];
 figure
 plot(t, y_data); hold on
-plot(t, m);
+plot(t, m*ones(1,N));
 plot(t_train, x_hat_data(plot_rows,:));
 hold off;
 legend('Actual x', 'Actual theta', 'Estimate x','Estimate theta')
