@@ -22,7 +22,7 @@ n = size(X,2); % Number of states
 
 % Parameters
 N_train = 5000; % Num of data samples for training, rest for testing
-sigma = 0.00000001; % Standard deviation of noise
+sigma = 0.00000; % Standard deviation of noise
 
 % Train/Test split
 X_train = X(1:N_train, :);
@@ -219,7 +219,7 @@ for i = 2:n
     end
 end
 
-%Set equal y_scales for scatter plots
+% Set equal y_scales for scatter plots
 y_min = y_min*1e-1; % Give viewing space before limit
 y_max = y_max*1e1;
 for i = 1:n
@@ -231,10 +231,10 @@ for i = 1:n
 end
 
 %% Compare real Xi to model Xi with bar plots
-load('cartpend_real_Xi')
+% load('cartpend_real_Xi')
 index = 2;
 for i = 1:2
-    figure; bar3([Xi(:,index)]) %, real_Xi(:,index)]);
+    figure; bar3([Xi(:,index), real_Xi(:,index)]);
     index = index + 2;
 end
 
@@ -348,6 +348,10 @@ function Theta_X = Theta(X, U, polyorder)
     Theta_X = [Theta_X, X(:,4).^2.*sin(X(:,3)).*cos(X(:,3))];
     Theta_X = [Theta_X, X(:,2).*cos(X(:,3))];
     Theta_X = [Theta_X, cos(X(:,3)).*U];
+    
+    % Remove unneccesary functions
+    Theta_X = Theta_X(:,[1:6, 20:end]);
+    
     
 end
 

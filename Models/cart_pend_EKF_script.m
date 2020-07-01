@@ -2,20 +2,47 @@
 % simueltaneous state and parameter estimation
 % on data from cart_pend
 
+% System definition
+f = @cartpend; % Function handle
+g = @measure; % Measurement function handle
+
 % Read simulation data
+load('cartpend_random_1');
 x_data = out.x.Data';
-y_data = out.y.Data';
+y_data = g(x_data);
 u_data = out.u.Data';
 t = out.x.Time';
 Ts = t(2)-t(1);
+N = length(t);
+
+% Train/Test split
+N_train = 3000; % Num of data samples for training, rest for testing
+y_train = y_data(:,1:N_train);
+u_train = u_data(:,1:N_train);
+t_train = t(:,1:N_train);
+
+N_test = N - N_train + 1; % Num of data samples for testing
+y_test = y_data(:,N_train:end); % One sample overlaps for initial condition
+u_test = u_data(:,N_train:end);
+t_test = t(:,N_train:end);
+
+% Add noise
+sigma = 0.1;
+y_train = y_train + sigma*randn(size(y_train));
+
+% Actual parameters
+m = 2*ones(1,N); % Mass of payload
+M = 4*ones(1,N); % Mass of cart
+L = 1*ones(1,N); % Length of pendulum
+d = 5*ones(1,N); % Linear damping coef on cart
 
 % Dimensions
-[nx, n_time] = size(x_data)
-[ny, n_time] = size(y_data)
-[nu, n_time] = size(u_data)
+nx = size(x_data,1); % number of states
+ny = size(y_data,1); % number of measurements
+nu = size(u_data,1); % number of inputs
 
 % Initialise
-x0 = [0; 0; 0; 0.5; 2; 10; 10; 4];
+x0 = [1; -0.2; -0.5; 0.8; 1.1];
 nx = length(x0);
 P0 = 0.5*eye(nx);
 u0 = 0;
@@ -23,24 +50,9 @@ x_hat = x0;
 P = P0;
 u = u0;
 
-Q = 0.00001*eye(nx); % Model uncertainty
-R = 0.0001*eye(ny); % Measurement uncertainty
-
-% System definition
-m = 1;
-M = 5;
-L = 2;
-g = -9.81;
-d = 1;
-
-f = @cartpend; % Function handle
-g = @measure; % Measurement function handle
-A = jaccsd(f,x_hat,u);
-F = A;
-B = [0; 1/M; 0; -1/(M*L); 0]; % ?? Later change jaccsd to also compute B
-C = jaccsd(g,x_hat,u);
-H = C;
-D = 0;
+% Uncertainty values
+Q = diag([0; 0; 0.000001; 0.0000001; 0.001]); % Model uncertainty
+R = 0.1*eye(ny); % Measurement uncertainty
 
 % Extrapolate
 x_hat_dwork = x_hat + f(x_hat,u)*Ts; % Numeric integration to extrapolate state
@@ -49,20 +61,20 @@ F = jaccsd(f,x_hat,u); % Calculate Jacobian of continuous system
 Phi = eye(nx) + F*Ts + 1/2*(F*Ts)^2; % ??? where is this from? 2nd order Taylor expansion? (continuous to discrete)
 P_dwork = Phi*P*Phi' + Q; % Extrapolate uncertainty
 
-x_hat_data = zeros(nx, n_time); % Assign memory beforehand
+x_hat_data = zeros(nx, N_train); % Assign memory beforehand
 
 % Apply EKF at every timestep
-for n = 1:1:n_time-1
+for n = 1:1:N_train-1
     % Measurement
-    y = y_data(n);
-    u = u_data(n);
+    y = y_train(n);
+    u = u_train(n);
     
     % Get saved data
     x_hat = x_hat_dwork;
     P = P_dwork;
     
     % Update
-    H = jaccsd(g,x_hat,0); % Linearise measurement function
+    H = jaccsd(g,x_hat,u); % Linearise measurement function
     K = (P*H')/(H*P*H' + R); % Compute Kalman gain (b*inv(A) -> b/A)
     x_hat = x_hat + K*(y - H*x_hat); % Update estimate with measurement
     KH_term = (eye(nx) - K*H);
@@ -71,7 +83,7 @@ for n = 1:1:n_time-1
     % Output
     x_hat_data(:,n) = x_hat;
     
-   % Extrapolate for next time step
+    % Extrapolate for next time step
     x_hat = x_hat + f(x_hat,u)*Ts; % Numeric integration (extrapolate state)
 
     F = jaccsd(f,x_hat,0); % Calculate Jacobian of continuous system
@@ -84,12 +96,11 @@ for n = 1:1:n_time-1
     
 end
 
-plot_rows = [1 3];
+plot_rows = [1,2,3,4];
 figure
-plot(t, x_data(plot_rows,:)); 
-hold on
-plot(t, x_hat_data(plot_rows,:));
-% plot(t, y_data);
+plot(t, y_data); hold on
+plot(t, m);
+plot(t_train, x_hat_data(plot_rows,:));
 hold off;
 legend('Actual x', 'Actual theta', 'Estimate x','Estimate theta')
 
@@ -101,14 +112,14 @@ function dx = cartpend(x,u)
 %     x_dot;
 %     theta;
 %     theta_dot;
-%     m;]
+%     L;]
 
 % Parameters
-m = x(6); % 1
-M = x(8); % 5
-L = x(5); % 2
+m = 2; %x(6);
+M = 4; %x(8);
+L = x(5);
 g = -9.81;
-d = x(7); % 10
+d = 5; %x(7);
 
 Sx = sin(x(3));
 Cx = cos(x(3));
@@ -124,10 +135,13 @@ dx(4,1) = (1/D)*((m+M)*m*g*L*Sx - m*L*Cx*(m*L*x(4)^2*Sx - d*x(2))) - m*L*Cx*(1/D
 end
 
 function y = measure(x,u)
-% Measurement function    
-y(1) = x(1);
-y(2) = x(3);
+    % Measurement function    
+    y(1,:) = x(1,:);
+    y(2,:) = x(2,:);
+    y(3,:) = x(3,:);
+    y(4,:) = x(4,:);
 end
+
 
 function J=jaccsd(f,x,u) % ??? Maybe should use simbolic diff for more exact
 % JACCSD Jacobian through complex step differentiation
@@ -140,7 +154,6 @@ f_x = f(x,u);
 n = numel(x);
 m = numel(f_x);
 J = zeros(m,n);
-% ?? Maybe later add calculation of B also
 h = n*eps;
 for k=1:n
     x1 = x;

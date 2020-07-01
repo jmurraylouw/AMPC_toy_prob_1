@@ -184,6 +184,7 @@ function Start(block)
     x_hat = x_hat + f(x_hat,u)*Ts; % Numeric integration to extrapolate state
 
     Phi = eye(nx) + F*Ts + 1/2*(F*Ts)^2; % ??? where is this from? 2nd order Taylor expansion? (continuous to discrete)
+Q
     P = Phi*P*Phi' + Q; % Extrapolate uncertainty
 
     % Assign to memory/Dwork
