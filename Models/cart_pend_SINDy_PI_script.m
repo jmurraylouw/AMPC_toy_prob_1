@@ -8,29 +8,36 @@
 tic; % Start timer
 
 %% Read Data
-
-% Load: x0 and out from simulation
-
-% load('rational_toy_with_input_data_1.mat') % Polyorder = 2
-% load('rational_toy_poly3_1.mat') % Polyorder = 3
-% load('cartpend_data_3');
 load('cartpend_real_Xi'); % Load value for Xi that works
 load('cartpend_random_1');
 
+% All simulation data before train/test split
 t = out.tout;
 Ts = t(2) - t(1);
-X = out.x.Data;
-X_dot = out.x_dot.Data; % ??? Change to calculate dx with total variation derivative
-U = out.u.Data;
+X = out.x.Data; % All X data (train + test)
+X_dot = out.x_dot.Data; % All X_dot data (train + test)
+U = out.u.Data; % All U data (train + test)
 N = size(X,1); % Number of data samples per state
 n = size(X,2); % Number of states
 
 % Parameters
-N_train = 8000;
-sigma   = 0.0000; % Standard deviation of noise
+N_train = 3000; % Num of data samples for training, rest for testing
+sigma = 0; % Standard deviation of noise
+
+% Train/Test split
+X_train = X(1:N_train, :);
+X_dot_train = X_dot(1:N_train, :);
+U_train = U(1:N_train, :);
+t_train = t(1:N_train, :);
+
+N_test = N - N_train + 1; % Num of data samples for testing
+X_test = X(N_train:end, :); % One sample overlaps for initial condition
+X_dot_test = X_dot(N_train:end, :);
+U_test = U(N_train:end, :);
+t_test = t(N_train:end, :);
 
 % Add noise to measurements
-X       = X + sigma*randn(size(X));
+X_train = X_train + sigma*randn(size(X_train));
 
 %% Total Variation Regularized Differentiation
 % % Implementation of TVRegDiff from the publication "Sparse identification of nonlinear dynamics for model predictive control in the low-data limit" by E. Kaiser, J. N. Kutz and S. L. Brunton.
@@ -76,16 +83,9 @@ X       = X + sigma*randn(size(X));
 %     t = t(50:end-51);
 % end
 
-% Choose window size for training data
-
-X = X(1:N_train,:);
-X_dot = X_dot(1:N_train,:);
-U = U(1:N_train,:);
-t = t(1:N_train,:);
-
 % Plot data
-figure(1), plot(t,X);
-title("Training data");
+figure(1), plot(t_train,X_train);
+title("Traing Data");
 % drawnow;
 
 %% Find best model for each state
@@ -95,7 +95,7 @@ lambda_list = logspace(-6,-1,5); % List of lambdas to try
 % lambda_list = 1e-4;
 
 % Theta to compute function for x_dot
-Theta_X = Theta(X,U,polyorder);
+Theta_X = Theta(X_train,U_train,polyorder);
 num_functions = size(Theta_X,2)*2; % Number of functions in Theta(x,xdot) library
 
 Xi = zeros(size(Theta_X,2)*2,n); % Stores final Xi, which each column a xi per state
@@ -109,14 +109,9 @@ index = 1;
 guess_list = 1:1:size(Theta_X,2);
 dont_guess = [24,25]; % Row indices not to guess during regression
 guess_list = guess_list(~ismember(guess_list,dont_guess)); % Remove indices of dont_guess
-% guess_list = guess_list(guess_list~=1);
-% guess_list = guess_list(guess_list~=34); % Remove sin^2 because trig identity give false low error
-% guess_list = guess_list(guess_list~=35);
-% guess_list = guess_list(guess_list~=36); % Remove cos^2
-% guess_list = [3,6, 7];
 
 for i = [2, 4] % Only state 1 and 3 % Loop through all states, i
-    Theta_i = [Theta_X, diag(X_dot(:,i))*Theta_X]; % Theta used for x1 only
+    Theta_i = [Theta_X, diag(X_dot_train(:,i))*Theta_X]; % Theta used for x1 only
     
     min_metric = Inf; % Store minimum model 2-norm error
     best_lambda = Inf; % Store best lambda
@@ -250,7 +245,7 @@ x_names = {'x1', 'x2', 'x3', 'x4', 'u'};
 % x_names = [x_names, {'1'}, x_names];
 
 vis_Xi = visualize_Xi(x_names, Xi, polyorder)
-vis_real_Xi = visualize_Xi(x_names, Xi, polyorder);
+vis_real_Xi = visualize_Xi(x_names, real_Xi, polyorder);
 
 lambda_list
 model_errors
@@ -260,44 +255,36 @@ model_column_guess % Guessed column of Theta that worked best
 disp('Model computation time')
 toc; % Display computation time
 
-%% Validatation
-% Run model on new data and compare to actual measurements
+%% Testing
+% Run model on unseen testing data and compare to actual measurements
 
-% Load x0, out from a simulation
-% load('rational_toy_with_input_data_2.mat') % Polyorder = 2
-% load('rational_toy_poly3_2.mat') % Polyorder = 3
-load('cartpend_data_4')
-
-t_valid = out.tout;
-X_valid = out.x.Data;
-U_valid = out.u.Data;
-
-% Only use portion of data
-t_valid = t_valid(1:N_train,:);
-X_valid = X_valid(1:N_train,:);
-U_valid = U_valid(1:N_train,:);
-
+x0 = X_test(1,:); % Initial condition
+x_hat = zeros(N_test,n); % Empty prediction matrix
+x_hat(1,:) = x0; 
 % Generate data with SINDY-PI model
-x0 = X_valid(1,:);
-x_hat = zeros(N_train,n);
-t_hat = zeros(N_train,1);
-x_hat(1,:) = x0;
-t_hat(1,:) = 0;
-
 % Solve for small intervals with constant u
-for i=2:size(U_valid,1)
-    u = (U_valid(i-1,:)+U_valid(i,:))/2; % Assume constant u at average of time interval
-    [t_1,x_1] = ode45(@(t_1,x_1) SINDy_PI_ODE(t_1,x_1,u,Xi,polyorder), t_valid(i-1:i,1), x0);
-    x_hat(i,:) = x_1(end,:);
-    t_hat(i,:) = t_1(end,:);
+for i=1:N_test-1
     x0 = x_hat(i,:)';
+    u = U_test(i,:); %(U_test(i,:) + U_test(i+1,:))/2; % Assume constant u at average of time interval
+    [t_1,x_1] = ode45(@(t_1,x_1) SINDy_PI_ODE(t_1,x_1,u,Xi,polyorder), t_test(i:i+1,1), x0);
+    x_hat(i+1,:) = x_1(end,:);
 end
 
-% Plot simulation data vs model data
-figure
-plot(t_valid,X_valid); hold on;
-plot(t_hat,x_hat,'--', 'LineWidth', 1); hold off;
-title('Validation data vs Model');
+y_hat = x_hat(:,[1,3]);
+y_test = X_test(:,[1,3]);
+
+% Vector of Root Mean Squared Error on testing data
+RMSE = sqrt(sum((y_hat' - y_test').^2, 2)./N_test) % Each row represents RMSE for measured state
+
+
+%% Plot simulation data vs model data
+figure(1), hold on;
+plot(t_test,y_test); hold on;
+plot(t_test,y_hat,'--', 'LineWidth', 1);
+plot(t,U, ':'); 
+plot([t(N_train) t(N_train)], ylim, 'k');
+hold off;
+title('Training and Validation data vs Model');
 
 disp('Total execution time')
 toc; % Display total execution time
