@@ -21,8 +21,8 @@ N = size(X,1); % Number of data samples per state
 n = size(X,2); % Number of states
 
 % Parameters
-N_train = 3000; % Num of data samples for training, rest for testing
-sigma = 0; % Standard deviation of noise
+N_train = 5000; % Num of data samples for training, rest for testing
+sigma = 0.00000001; % Standard deviation of noise
 
 % Train/Test split
 X_train = X(1:N_train, :);
@@ -40,50 +40,50 @@ t_test = t(N_train:end, :);
 X_train = X_train + sigma*randn(size(X_train));
 
 %% Total Variation Regularized Differentiation
-% % Implementation of TVRegDiff from the publication "Sparse identification of nonlinear dynamics for model predictive control in the low-data limit" by E. Kaiser, J. N. Kutz and S. L. Brunton.
-% denoise = 0;
-% if(denoise)
-%     alpha = 7*10.^1
-%     X_dot_clean = zeros(size(X)+[1 0]);
-%     for i = 1:size(X,2)
-%         tic
-%         X_dot_clean(:,i) = TVRegDiff( X(:,i), 10, alpha, [], 'small', 1e6, Ts, 0, 0 ); %.00002
-%         toc
-%     end
-%     % Because 'small' adds extra entry:
-%     X_dot_clean = X_dot_clean(2:end,:);
-% 
-%     % Use integral of X_dot_clean for X_clean
-%     X_clean = zeros(size(X));
-%     for i = 1:size(X,2)
-%         X_clean(:,i) = X_clean(1,i) + cumtrapz(t, X_dot_clean(:,i)); % Numeric integration
-%         X_clean(:,i) = X_clean(:,i) - (mean(X_clean(50:end-50,i)) - mean(X(50:end-50,i))); % Adjust mean
-%     end
-%     X_clean = X_clean(50:end-51,:);
-%     X_dot_clean = X_dot_clean(50:end-51,:);  % trim off ends (overly conservative)
-%     % 
-%     % tc = t(50:end-51);
-%     % f=1;
-%     % for f=1:4
-%     % subplot(1,2,1), plot(t,X_dot(:,f)); hold on
-%     % plot(tc,X_dot_clean(:,f)); hold off
-%     % title('X dot')
-%     % legend('measured', 'clean')
-%     % subplot(1,2,2), plot(t,X(:,f)); hold on
-%     % plot(tc,X_clean(:,f)); hold off
-%     % title('X')
-%     % legend('measured', 'clean')
-%     % pause
-%     % end
-% 
-%     % Use denoised data
-%     X = X_clean;
-%     X_dot = X_dot_clean;
-%     U = U(50:end-51);
-%     t = t(50:end-51);
-% end
+% Implementation of TVRegDiff from the publication "Sparse identification of nonlinear dynamics for model predictive control in the low-data limit" by E. Kaiser, J. N. Kutz and S. L. Brunton.
+denoise = 0; % 1 = Enable denoising
+if(denoise)
+    alpha = 1*10.^1
+    X_dot_clean = zeros(size(X_train)+[1 0]);
+    for i = 1:size(X_train,2)
+        tic
+        X_dot_clean(:,i) = TVRegDiff( X_train(:,i), 10, alpha, [], 'small', 1e6, Ts, 0, 0 ); %.00002
+        toc
+    end
+    % Cutoff index=1, because 'small' setting adds extra entry:
+    X_dot_clean = X_dot_clean(2:end,:);
+
+    % Use integral of X_dot_clean for X_clean
+    X_clean = zeros(size(X_train));
+    for i = 1:size(X_train,2)
+        X_clean(:,i) = X_clean(1,i) + cumtrapz(t_train, X_dot_clean(:,i)); % Numeric integration
+        X_clean(:,i) = X_clean(:,i) - (mean(X_clean(50:end-50,i)) - mean(X_train(50:end-50,i))); % Adjust mean
+    end
+    X_clean = X_clean(50:end-51,:);
+    X_dot_clean = X_dot_clean(50:end-51,:);  % trim off ends (overly conservative)
+    
+    tc = t_train(50:end-51);
+    for f=1:4
+    subplot(1,2,1), plot(t_train,X_dot_train(:,f)); hold on
+    plot(tc,X_dot_clean(:,f)); hold off
+    title('X dot')
+    legend('measured', 'clean')
+    subplot(1,2,2), plot(t_train,X_train(:,f)); hold on
+    plot(tc,X_clean(:,f)); hold off
+    title('X')
+    legend('measured', 'clean')
+    pause
+    end
+
+    % Use denoised data
+    X_train = X_clean;
+    X_dot_train = X_dot_clean;
+    U_train = U_train(50:end-51);
+    t_train = t_train(50:end-51);
+end
 
 % Plot data
+subplot(1,1,1);
 figure(1), plot(t_train,X_train);
 title("Traing Data");
 % drawnow;
