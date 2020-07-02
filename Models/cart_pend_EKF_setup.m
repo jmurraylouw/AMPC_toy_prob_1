@@ -12,13 +12,14 @@ g = @measure; % Measurement function handle
 % x = [x, x_dot, theta, theta_dot, L, m, d]
 x0 = [0; 0; 0; 0];
 x_guess = [0; 0; 0; 0; 2; 4; 1; 5];
+x_guess = x_guess + 0.1*randn(size(x_guess));
 nx = length(x_guess); % 4 states, 3 paramters
 ny = length(g(x_guess)); % x and theta
 u0 = 0;
 nu = length(u0);
 
-P0 = diag([0; 0.00001; 0; 0.00001; 0.01; 0.01; 0.01; 0.01]); % Initial guess uncertainty
-Q = diag([0; 0.00001; 0; 0.00001; 0.00005; 0.00005; 0.00005; 0.00005]); % Model uncertainty
+P0 = 0.1*eye(nx); % Initial guess uncertainty
+Q = diag([0; 0.00001; 0; 0.00001; 0.00001; 0.00001; 0.00001; 0.00001]) % Model uncertainty
 R = 0.001*eye(ny); % Measurement uncertainty
 
 

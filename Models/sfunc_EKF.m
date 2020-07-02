@@ -187,13 +187,13 @@ function Start(block)
 
     P = Phi*P*Phi' + Q; % Extrapolate uncertainty
 
-    % Enforce positive parameters constraint
-    min_param = 0.01; % Min allowable param value
-    if nx > 4 % If paramters are estimated
-        for i = 5:nx 
-            x_hat(i) = max(x_hat(i), min_param);
-        end
-    end
+%     % Enforce positive parameters constraint
+%     min_param = 0.01; % Min allowable param value
+%     if nx > 4 % If paramters are estimated
+%         for i = 5:nx 
+%             x_hat(i) = max(x_hat(i), min_param);
+%         end
+%     end
     % Assign to memory/Dwork
     block.Dwork(1).Data = x_hat;
     block.Dwork(2).Data = reshape(P, 1, nx*nx);

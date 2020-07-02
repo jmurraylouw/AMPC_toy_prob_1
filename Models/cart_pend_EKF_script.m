@@ -22,37 +22,31 @@ u_train = u_data(:,1:N_train);
 t_train = t(:,1:N_train);
 
 N_test = N - N_train + 1; % Num of data samples for testing
-y_test = y_data(:,N_train:end); % One sample overlaps for initial condition
+x_test = x_data(:,N_train:end); % One sample of testing data overlaps for initial condition
+y_test = y_data(:,N_train:end); 
 u_test = u_data(:,N_train:end);
 t_test = t(:,N_train:end);
 
 % Add noise
-sigma = 0.1;
+sigma = 0.001;
 y_train = y_train + sigma*randn(size(y_train));
 
-% Actual parameters
-m = 2; % Mass of payload
-M = 4; % Mass of cart
-L = 1; % Length of pendulum
-d = 5; % Linear damping coef on cart
-
-% Dimensions
-nx = size(x_data,1); % number of states
-ny = size(y_data,1); % number of measurements
-nu = size(u_data,1); % number of inputs
-
 % Initialise
-x0 = [1; -0.2; -0.5; 0.8; 1.1];
-nx = length(x0);
-P0 = 0.5*eye(nx);
+% x = [x, x_dot, theta, theta_dot, L, m, d]
+x0 = [0; 0; 0; 0; 2; 4; 1; 5]; % Correct initial values
+x0 = x0 + 0*randn(size(x0)); % Add random alue to initial guesses
+nx = length(x0); % 4 states, 3 paramters
+ny = length(g(x0)); % x and theta
 u0 = 0;
+nu = length(u0);
+
+P0 = 0.1*eye(nx); % Initial guess uncertainty
+Q = diag([0; 0.00001; 0; 0.00001; 0.00001; 0.00001; 0.00001; 0.00001]); % Model uncertainty
+R = sigma*eye(ny); % Measurement uncertainty
+
 x_hat = x0;
 P = P0;
 u = u0;
-
-% Uncertainty values
-Q = diag([0; 0; 0.000001; 0.0000001; 0.001]); % Model uncertainty
-R = 0.1*eye(ny); % Measurement uncertainty
 
 % Extrapolate
 x_hat_dwork = x_hat + f(x_hat,u)*Ts; % Numeric integration to extrapolate state
@@ -64,10 +58,10 @@ P_dwork = Phi*P*Phi' + Q; % Extrapolate uncertainty
 x_hat_data = zeros(nx, N_train); % Assign memory beforehand
 
 % Apply EKF at every timestep
-for n = 1:1:N_train-1
+for n = 1:1:N_train
     % Measurement
-    y = y_train(n);
-    u = u_train(n);
+    y = y_train(:,n);
+    u = u_train(:,n);
     
     % Get saved data
     x_hat = x_hat_dwork;
@@ -79,7 +73,7 @@ for n = 1:1:N_train-1
     x_hat = x_hat + K*(y - H*x_hat); % Update estimate with measurement
     KH_term = (eye(nx) - K*H);
     P = KH_term*P*KH_term' + K*R*K'; % Update estimate uncertainty
-       
+    
     % Output
     x_hat_data(:,n) = x_hat;
     
@@ -96,14 +90,59 @@ for n = 1:1:N_train-1
     
 end
 
-plot_rows = [1,2,3,4];
+% Actual parameters
+m = 2; % Mass of payload
+M = 4; % Mass of cart
+L = 1; % Length of pendulum
+d = 5; % Linear damping coef on cart
+
+% Plot parameter estimation
+param_rows = [5:8];
+figure
+plot(t_train, m*ones(1,N_train)); hold on
+plot(t_train, M*ones(1,N_train));
+plot(t_train, L*ones(1,N_train));
+plot(t_train, d*ones(1,N_train));
+plot(t_train, x_hat_data(param_rows,:));
+hold off;
+legend('m','M','L','d','m est','M est','L est','d est');
+title('Parameter estimation');
+
+% Extract final model parameters
+m = x_hat_data(5,end);
+M = x_hat_data(6,end);
+L = x_hat_data(7,end);
+d = x_hat_data(8,end);
+
+%% Testing
+% Run model on unseen testing data and compare to actual measurements
+
+x0 = [x_test(:,1);m;M;L;d]; % Initial condition
+x_hat = zeros(nx,N_test); % Empty prediction matrix
+x_hat(:,1) = x0; 
+% Generate data with SINDY-PI model
+% Solve for small intervals with constant u
+for i=1:N_test-1
+    x0 = x_hat(:,i); % initial condition for this time step
+    u = u_test(:,i); %(U_test(i,:) + U_test(i+1,:))/2; % Assume constant u at average of time interval
+    [t_1,x_1] = ode45(@(t_1,x_1) cartpend(x_1,u), t_test(i:i+1), x0);
+    x_hat(:,i+1) = x_1(end,:);
+end
+
+y_hat = x_hat([1,3],:);
+y_test = x_test([1,3],:);
+
+% Vector of Root Mean Squared Error on testing data
+RMSE = sqrt(sum((y_hat - y_test).^2, 2)./N_test) % Each row represents RMSE for measured state [RMSE_x]
+
+state_rows = [1,3];
 figure
 plot(t, y_data); hold on
-plot(t, m*ones(1,N));
-plot(t_train, x_hat_data(plot_rows,:));
+plot(t_train, x_hat_data(state_rows,:), '--'); % Plot state estimation on trainging data
+plot(t_test, y_hat, '--');
+plot([t(N_train) t(N_train)], ylim, 'k');
 hold off;
-legend('Actual x', 'Actual theta', 'Estimate x','Estimate theta')
-
+title('State estimation');
 
 function dx = cartpend(x,u)
 % Adapted from code by Steve Brunton
@@ -115,11 +154,11 @@ function dx = cartpend(x,u)
 %     L;]
 
 % Parameters
-m = 2; %x(6);
-M = 4; %x(8);
-L = x(5);
+m = x(5);% 2;
+M = x(6); % 4;
+L = x(7); % 1
 g = -9.81;
-d = 5; %x(7);
+d = x(8); % 5;
 
 Sx = sin(x(3));
 Cx = cos(x(3));
@@ -137,9 +176,7 @@ end
 function y = measure(x,u)
     % Measurement function    
     y(1,:) = x(1,:);
-    y(2,:) = x(2,:);
-    y(3,:) = x(3,:);
-    y(4,:) = x(4,:);
+    y(2,:) = x(3,:);
 end
 
 
