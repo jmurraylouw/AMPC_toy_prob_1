@@ -21,7 +21,7 @@ N = size(X,1); % Number of data samples per state
 n = size(X,2); % Number of states
 
 % Parameters
-N_train = 5000; % Num of data samples for training, rest for testing
+N_train = 3000; % Num of data samples for training, rest for testing
 sigma = 0.00000; % Standard deviation of noise
 
 % Train/Test split
@@ -232,11 +232,11 @@ end
 
 %% Compare real Xi to model Xi with bar plots
 % load('cartpend_real_Xi')
-index = 2;
-for i = 1:2
-    figure; bar3([Xi(:,index), real_Xi(:,index)]);
-    index = index + 2;
-end
+% index = 2;
+% for i = 1:2
+%     figure; bar3([Xi(:,index), real_Xi(:,index)]);
+%     index = index + 2;
+% end
 
 % histogram(k_list) % Display frequency of values of k where Xi converged
 
@@ -291,7 +291,7 @@ toc; % Display total execution time
 
 warning('on','MATLAB:rankDeficientMatrix'); % Switch on warning for other scripts
 
-% Maximise figures
+%% Maximise figures
 for i=1:4
     figure(i), set(gcf,'units','normalized','outerposition',[0 0 1 1]);
 end
