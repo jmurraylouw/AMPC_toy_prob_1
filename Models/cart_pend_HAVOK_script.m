@@ -29,35 +29,38 @@ p = 34; % Truncated rank of system
 c = 1; % Column spacing of Hankel matrix
 d = 1; % Row spacing of Hankel matrix
 q = 1000; % number of delays
-w = 2000; % (named 'p' in Multiscale paper) number of columns in Hankel matrix
-sigma = 0.1; % Noise standard deviation
+sigma = 0.0; % Noise standard deviation
+N_train = 3000; % Num of data samples for training, rest for testing
+w = N_train - q; % (named 'p' in Multiscale paper) number of columns in Hankel matrix
+
 
 % Working for:
 % p = 80; % Truncated rank of system
 % c = 1; % Column spacing of Hankel matrix
 % d = 1; % Row spacing of Hankel matrix
 % q = 1000; % number of delays
-% w = 2000; % (named 'p' in Multiscale paper) number of columns in Hankel matrix
+% w = 2000; % number of columns in Hankel matrix (named 'p' in Multiscale paper) 
 % sigma = 0.01; % Noise standard deviation
 
 numel_H = q*m*w;
 log10(numel_H)
 time_predict = 6e-6*numel_H
 
-final_sample = (q-1)*d + (w-1)*c + 2 % Last sample used in Hankel matrix
+final_sample = (q-1) + (w-1) + 2 % Last sample used in Hankel matrix
 assert(final_sample <= N, 'Not enough data. Change q, d, w, or c'); % otherwise index out of bounds 
 D = (q-1)*d*Ts; % Delay duration
 
-% Train/Test split
-N_train = final_sample; % Num of data samples for training, rest for testing
-y_train = y_data(:,1:N_train);
-u_train = u_data(:,1:N_train);
-t_train = t(:,1:N_train);
+% Testing data - Last 50 s is for testing and one sample overlaps training
+N_test = 5000; % Num of data samples for testing
+x_test = x_data(:,end-N_test+1:end); % One sample of testing data overlaps for initial condition
+y_test = y_data(:,end-N_test+1:end); 
+u_test = u_data(:,end-N_test+1:end);
+t_test = t(:,end-N_test+1:end);
 
-N_test = N - N_train + 1; % Num of data samples for testing
-y_test = y_data(:,N_train:end); % One sample overlaps for initial condition
-u_test = u_data(:,N_train:end);
-t_test = t(:,N_train:end);
+% Training data - Last sample of training is first sample of testing
+y_train = y_data(:,end-N_test-N_train+2:end-N_test+1);
+u_train = u_data(:,end-N_test-N_train+2:end-N_test+1);
+t_train = t(:,end-N_test-N_train+2:end-N_test+1);
 
 % Add noise
 y_train = y_train + sigma*randn(size(y_train));
@@ -174,8 +177,8 @@ end
 
 y_hat = Y_hat(end-m+1:end, :); % Extract only non-delay time series (last m rows)
 
-% Vector of Root Mean Squared Error on testing data
-RMSE = sqrt(sum((y_hat - y_test).^2, 2)./N_test) % Each row represents RMSE for measured state
+% Vector of Mean Absolute Error on testing data
+MAE = sum(abs(y_hat - y_test), 2)./N_test % For each measured state
 
 disp('Run model on testing data')
 toc;
@@ -185,7 +188,7 @@ disp(6)
 % Initial conditions
 y_hat_02 = zeros(q*m,1);
 for row = 0:q-1 % Create first column of spaced Hankel matrix
-    y_hat_02(row*m+1:(row+1)*m, 1) = y_data(:, row*d + 1);
+    y_hat_02(row*m+1:(row+1)*m, 1) = y_train(:, row*d + 1);
 end
 k_start = row*d + 1; % First k to start at
 
@@ -206,8 +209,9 @@ hold on;
 plot(t, u_data, ':', 'LineWidth', 1);
 plot(t_test, y_hat, '--', 'LineWidth', 1); % Plot only non-delay coordinate
 plot(t_train, y_hat2, '--', 'LineWidth', 1); % Plot only non-delay coordinate  
-plot([D D], ylim, 'r');
-plot([t(N_train) t(N_train)], ylim, 'k');
+plot((D + t(N-N_test-N_train)).*[1,1], ylim, 'r');
+plot(t(N-N_test-N_train).*[1,1], ylim, 'r');
+plot(t(N-N_test).*[1,1], ylim, 'k');
 title('Training and Testing data vs Model');
 % legend('x', 'theta', 'input', 'x_hat', 'theta_hat', 'D', 't(final sample)')
 hold off;

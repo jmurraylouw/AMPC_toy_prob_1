@@ -134,8 +134,8 @@ end
 y_hat = x_hat([1,3],:);
 y_test = x_test([1,3],:);
 
-% Vector of Root Mean Squared Error on testing data
-MAE = sum(abs(y_hat - y_test), 2)./N_test % Mean Absolute Error for each state
+% Vector of Mean Absolute Error on testing data
+MAE = sum(abs(y_hat - y_test), 2)./N_test % For each measured state
 
 state_rows = [1,3];
 figure
