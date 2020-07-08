@@ -3,7 +3,7 @@
 % Partial state feedback
 
 %% Read data
-
+close all;
 load('cartpend_random_1.mat') % Load simulation data
 % x0 = [1; -0.2; -0.5; 0.8]
 u_data  = out.u.Data';
@@ -11,7 +11,7 @@ x_data  = out.x.Data';
 
 n = size(x_data,1); % number of states
 I = eye(n);
-C = I([1,2],:); % Measurement matrix (Only measures x,z,theta)
+C = I([1,3],:); % Measurement matrix (Only measures x,theta)
 y_data  = C*x_data; % Measurement data and theta
 n = size(x_data,1); % number of states
 m = size(y_data,1); % number of measurements
@@ -25,12 +25,12 @@ N  = length(t);     % Number of data samples
 
 %% Parameters
 % Very dependant on choice of p, r, q
-p = 40; % Truncated rank of system
+p = 34; % Truncated rank of system
 c = 1; % Column spacing of Hankel matrix
 d = 1; % Row spacing of Hankel matrix
 q = 1000; % number of delays
 w = 2000; % (named 'p' in Multiscale paper) number of columns in Hankel matrix
-sigma = 0.001; % Noise standard deviation
+sigma = 0.1; % Noise standard deviation
 
 % Working for:
 % p = 80; % Truncated rank of system

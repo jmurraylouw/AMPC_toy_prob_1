@@ -28,7 +28,7 @@ u_test = u_data(:,N_train:end);
 t_test = t(:,N_train:end);
 
 % Add noise
-sigma = 0.001;
+sigma = 0.0;
 y_train = y_train + sigma*randn(size(y_train));
 
 % Initialise
