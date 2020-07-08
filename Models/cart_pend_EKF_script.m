@@ -15,34 +15,36 @@ t = out.x.Time';
 Ts = t(2)-t(1);
 N = length(t);
 
-% Train/Test split
-N_train = 3000; % Num of data samples for training, rest for testing
-y_train = y_data(:,1:N_train);
-u_train = u_data(:,1:N_train);
-t_train = t(:,1:N_train);
+% Testing data - Last 50 s is for testing and one sample overlaps training
+N_test = 5000; % Num of data samples for testing
+x_test = x_data(:,end-N_test+1:end); % One sample of testing data overlaps for initial condition
+y_test = y_data(:,end-N_test+1:end); 
+u_test = u_data(:,end-N_test+1:end);
+t_test = t(:,end-N_test+1:end);
 
-N_test = N - N_train + 1; % Num of data samples for testing
-x_test = x_data(:,N_train:end); % One sample of testing data overlaps for initial condition
-y_test = y_data(:,N_train:end); 
-u_test = u_data(:,N_train:end);
-t_test = t(:,N_train:end);
+% Training data - Last sample of training is first sample of testing
+N_train = 1000; % Num of data samples for training, rest for testing
+y_train = y_data(:,end-N_test-N_train+2:end-N_test+1);
+u_train = u_data(:,end-N_test-N_train+2:end-N_test+1);
+t_train = t(:,end-N_test-N_train+2:end-N_test+1);
 
 % Add noise
 sigma = 0.0;
 y_train = y_train + sigma*randn(size(y_train));
 
+% Parameters
+P0 = 0.1*eye(nx); % Initial guess uncertainty
+Q = diag([0; 0.00001; 0; 0.00001; 0.00001; 0.00001; 0.00001; 0.00001]); % Model uncertainty
+R = sigma*eye(ny); % Measurement uncertainty
+
 % Initialise
 % x = [x, x_dot, theta, theta_dot, L, m, d]
 x0 = [0; 0; 0; 0; 2; 4; 1; 5]; % Correct initial values
-x0 = x0 + 0*randn(size(x0)); % Add random alue to initial guesses
+x0 = x0 + P0(1,1)*randn(size(x0)); % Add random value to initial guesses
 nx = length(x0); % 4 states, 3 paramters
 ny = length(g(x0)); % x and theta
 u0 = 0;
 nu = length(u0);
-
-P0 = 0.1*eye(nx); % Initial guess uncertainty
-Q = diag([0; 0.00001; 0; 0.00001; 0.00001; 0.00001; 0.00001; 0.00001]); % Model uncertainty
-R = sigma*eye(ny); % Measurement uncertainty
 
 x_hat = x0;
 P = P0;
@@ -133,14 +135,15 @@ y_hat = x_hat([1,3],:);
 y_test = x_test([1,3],:);
 
 % Vector of Root Mean Squared Error on testing data
-RMSE = sqrt(sum((y_hat - y_test).^2, 2)./N_test) % Each row represents RMSE for measured state [RMSE_x]
+MAE = sum(abs(y_hat - y_test), 2)./N_test % Mean Absolute Error for each state
 
 state_rows = [1,3];
 figure
 plot(t, y_data); hold on
 plot(t_train, x_hat_data(state_rows,:), '--'); % Plot state estimation on trainging data
 plot(t_test, y_hat, '--');
-plot([t(N_train) t(N_train)], ylim, 'k');
+plot([t(N-N_test-N_train) t(N-N_test-N_train)], ylim, 'r');
+plot([t(N-N_test) t(N-N_test)], ylim, 'k');
 hold off;
 title('State estimation');
 
