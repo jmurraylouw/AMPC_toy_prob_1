@@ -5,6 +5,8 @@
 %% Try to save previous results of random search and continue with them
 
 %% Read data
+tic;
+
 close all;
 load('cartpend_random_1.mat') % Load simulation data
 % x0 = [1; -0.2; -0.5; 0.8]
@@ -32,21 +34,21 @@ d = 1; % Row spacing of Hankel matrix (for multiscale dynamics)
 % N_train; % Num of data samples for training, rest for testing
 % w; % (named 'p' in Multiscale paper) number of columns in Hankel matrix
 N_train_min = 10/Ts; % Minimum length of training data
-N_train_max = 20/Ts; % Maximum length of training data
-max_iterations = 10000; % Maximum number of iterations allowed in Random search
+N_train_max = 50/Ts; % Maximum length of training data
+max_iterations = 1000; % Maximum number of iterations allowed in Random search
 % p = 34; % Truncated rank of system
-p_min = 15; % Min value of p in Random search
+p_min = 20; % Min value of p in Random search
 p_max = 40; % Max value of p in Random search
 % q = 1000; % number of delays
-q_min = 100; % Min value of q in Random search
+q_min = 50; % Min value of q in Random search
 % q_max; % Max value of q in Random search
 
 % Add noise once
 y_data_noise = y_data + sigma*randn(size(y_data));
 
 % Lists to save results for different N_train
-N_train_list = N_train_min:200:N_train_max; % List of N_train to compute model for
-MAE_list = -1 + zeros(m,length(N_train_list)); % Save best MAE for each N_train
+N_train_list = N_train_min:1000:N_train_max; % List of N_train to compute model for
+MAE_list = Inf + zeros(m,length(N_train_list)); % Save best MAE for each N_train
 p_list = -1 + zeros(1,length(N_train_list)); % Save p of best MAE for each N_train
 q_list = -1 + zeros(1,length(N_train_list)); % Save q of best MAE for each N_train
 time_list = -1 + zeros(1,length(N_train_list)); % Save time taken for each N_train
@@ -60,13 +62,16 @@ for index = 1:length(N_train_list) % Loop through N_train_list
     q_best = NaN;
     MAE_best = Inf*[1;1];
 
-    % Random search for best hyperparameters
+%     q_max = floor(N_train/2); % Max q when Hankel is a square
+%     for q = 
+    Random search for best hyperparameters
     for iteration = 1:max_iterations % Loop truncateed rank
         timer = tic; % Start timer for this model evaluation
         
         q_max = floor(N_train/2); % Max q when Hankel is a square
-        q = randi(floor([q_min/100, q_max/100]))*100; % Scaled to get better uniform distribution
-        p = randi(floor([p_min, p_max]));
+        q = randi([q_min, q_max]); % Scaled to get better uniform distribution
+        p = randi([p_min, p_max]);
+        
         w = N_train - q; % num columns of Hankel matrix
         
         % numel_H = q*m*w;
@@ -244,38 +249,84 @@ for index = 1:length(N_train_list) % Loop through N_train_list
     
 end
 
+%% Merge new and saved results
+% If two results are for the same N_train, keep the one with the smallest error
+try
+    load('Data\N_train_error_time_HAVOK_sig=0.mat');
+catch
+    disp('No saved results to compare to')
+    N_train_saved = N_train_list;
+    MAE_saved = MAE_list;
+    p_saved = p_list;
+    q_saved = q_list;
+    time_saved = time_list;
+end
+% 
+% saved = [N_train_saved', mean(MAE_saved',2)]
+% list = [N_train_list', mean(MAE_list', 2)]
+
+li = 1; % List index
+si = 1; % Saved index
+
+for k=1:1e10 % Basically while true
+    if N_train_list(li) < N_train_saved(si) % list smaller
+        N_train_saved   = insert(N_train_saved, si, N_train_list(li));
+        MAE_saved       = insert(MAE_saved, si, MAE_list(:,li));
+        p_saved         = insert(p_saved, si, p_list(li));
+        q_saved         = insert(q_saved, si, q_list(li));
+        time_saved      = insert(time_saved, si, time_list(li));
+ 
+        si = si+1; % increment indices
+        li = li+1;
+    
+    elseif N_train_list(li) == N_train_saved(si) % list equal
+        if mean(MAE_list(:,li)) < mean(MAE_saved(:,si)) % If list has smaller MAE
+            MAE_saved(:,si) = MAE_list(:,li);
+            p_saved(si) = p_list(li);
+            q_saved(si) = q_list(li);
+            time_saved(si) = time_list(li);
+        end
+        
+        si = si+1; % Increment indices
+        li = li+1;
+    
+    else % list bigger
+        si = si+1; % Keep comparing current li, only increment si
+    end
+    
+    s_max = length(N_train_saved);
+    l_max = length(N_train_list);
+    
+    if li > l_max % If all items in list checked
+        break; 
+    
+    elseif si > s_max % If all in saved compared already
+        N_train_saved = [N_train_saved, N_train_list(li:end)]; % Append rest of list to saved
+        MAE_saved = [MAE_saved, MAE_list(:, li:end)]; % Append rest of list to saved
+        p_saved = [p_saved, p_list(li:end)]; 
+        q_saved = [q_saved, q_list(li:end)]; % Append rest of list to saved
+        time_saved = [time_saved, time_list(li:end)]; % Append rest of list to saved   
+        break;
+    end
+    
+end
+
+new_saved = [N_train_saved', mean(MAE_saved', 2)]
+
+% Save the results to append to later
+save('Data\N_train_error_time_HAVOK_sig=0.mat', 'N_train_saved', 'MAE_saved', 'p_saved', 'q_saved', 'time_saved');
+
 %%
-figure(1), plot(N_train_list,MAE_list(1,:))
-figure(2), plot(N_train_list,MAE_list(2,:))
-figure(3), plot(N_train_list,p_list)
-figure(4), plot(N_train_list,q_list)
-figure(5), plot(N_train_list,time_list)
+figure(1), plot(N_train_saved,MAE_saved(1,:)), title('MAE x vs N-train')
+figure(2), plot(N_train_saved,MAE_saved(2,:)), title('MAE theta vs N-train')
+figure(3), plot(N_train_saved,p_saved), title('p vs N-train')
+figure(4), plot(N_train_saved,q_saved), title('q vs N-train')
+figure(5), plot(N_train_saved,time_saved), title('time vs N-train')
+
+toc;
 disp('------------')
 disp('END of HAVOK')
 
-% %% Save data
-% havok_results = model_results(RMSE, sigma, y_hat, y_test, u_test, t_test, y_train, u_train, t_train, y_data, u_data, t, C);
-% 
-% havok_results.A = A; % System matrix
-% havok_results.B = B;% Input matrix
-% havok_results.p = p;
-% havok_results.r = r;
-% havok_results.c = c;
-% havok_results.d = d;
-% havok_results.q = q;
-% havok_results.w = w;
-
-% Map errors of different hyperparameters
-% surf(X_p,Y_delays,abs(RMSE_matrix))
-% min_error = min(min(RMSE_matrix(RMSE_matrix~=0)))
-% 
-% [col_mins, row_indexes] = min(RMSE_matrix(RMSE_matrix~=0));
-% [abs_min, col_index] = min(col_mins);
-% delays = row_indexes(col_index)
-% p = col_index
-% %%
-% RMSE_matrix(RMSE_matrix>2) = RMSE_matrix(RMSE_matrix>2)*0;
-% bar3(RMSE_matrix)
 
 %% Local functions
 function X_hat = plot_model(A,B,U_data,t,x0)
@@ -296,6 +347,15 @@ function X_hat = run_model(A,B,U_data,t,x0)
         X_hat(:,index+1) = A*X_hat(:,index) + B*U_data(index);
     end
 end
+
+function new_array = insert(array, index, entry)
+    if index == 1 % to avoid index-1 = 0
+        new_array = [entry, array];
+    else
+        new_array = [array(:, 1:index-1), entry, array(:, index:end)];
+    end
+end
+
 
 
 

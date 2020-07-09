@@ -17,11 +17,14 @@ time_list = rand(1,length(N_train_list)); % Save time taken for each N
 
 %% Merge new and saved results
 % If two results are for the same N_train, keep the one with the smallest error
-
-load('Data\N_train_error_time_HAVOK_sig=0.mat');
-
-saved = [N_train_saved', mean(MAE_saved',2)]
-list = [N_train_list', mean(MAE_list', 2)]
+try
+    load('Data\N_train_error_time_HAVOK_sig=0.mat');
+catch
+    disp('No saved results to compare to')
+end
+% 
+% saved = [N_train_saved', mean(MAE_saved',2)]
+% list = [N_train_list', mean(MAE_list', 2)]
 
 li = 1; % List index
 si = 1; % Saved index
@@ -69,12 +72,12 @@ for k=1:1e10 % Basically while true
     
 end
 
-new_saved = [N_train_saved', mean(MAE_saved', 2)]
+% new_saved = [N_train_saved', mean(MAE_saved', 2)]
 
 % Save the results to append to later
 save('Data\N_train_error_time_HAVOK_sig=0.mat', 'N_train_saved', 'MAE_saved', 'p_saved', 'q_saved', 'time_saved');
 
-bar(mean(MAE_saved',2))
+% bar(mean(MAE_saved',2))
 
 function new_array = insert(array, index, entry)
     if index == 1 % to avoid index-1 = 0
