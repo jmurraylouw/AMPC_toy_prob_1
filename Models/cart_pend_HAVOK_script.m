@@ -5,7 +5,7 @@
 %% Try to save previous results of random search and continue with them
 
 %% Read data
-tic;
+total_timer = tic;
 
 close all;
 load('cartpend_random_1.mat') % Load simulation data
@@ -33,19 +33,18 @@ c = 1; % Column spacing of Hankel matrix (for multiscale dynamics)
 d = 1; % Row spacing of Hankel matrix (for multiscale dynamics)
 % N_train; % Num of data samples for training, rest for testing
 % w; % (named 'p' in Multiscale paper) number of columns in Hankel matrix
-N_train_min = 20/Ts; % Minimum length of training data
+N_train_min = 10/Ts; % Minimum length of training data
 N_train_max = 30/Ts; % Maximum length of training data
-max_iterations = 1000; % Maximum number of iterations allowed in Random search
+% max_iterations = 1000; % Maximum number of iterations allowed in Random search
 % p = 34; % Truncated rank of system
-p_min = 25; % Min value of p in Random search
+p_min = 28; % Min value of p in Random search
 p_max = 35; % Max value of p in Random search
 % q = 1000; % number of delays
 q_min = 80; % Min value of q in Random search
 % q_max; % Max value of q in Random search
-q_increment = 2; % Increment value of q in Grid search
+q_increment = 50; % Increment value of q in Grid search
 p_increment = 2; % Increment value of p in Grid search
 
-q_search = q_min:q_increment:q_max; % List of q parameters to search in
 p_search = p_min:p_increment:p_max; % List of p to search, for every q
 
 % Add noise once
@@ -78,7 +77,7 @@ for index = 1:length(N_train_list) % Loop through N_train_list
 
     try
         load('Data\N_train_error_time_HAVOK_sig=0.mat');
-        
+        N_train_saved
         if ismember(N_train,N_train_saved)
             % Use previously saved best results
             save_index = find(N_train_saved == N_train); % Index of N_train in saved list
@@ -97,16 +96,19 @@ for index = 1:length(N_train_list) % Loop through N_train_list
         
     catch
         disp('No saved results to compare to')    
-        save_index = -1; % -1 means no saved data exits for N_train
+        save_index = -2; % -1 means no saved data exits for N_train
         p_best = NaN;
         q_best = NaN;
         MAE_best = Inf*[1;1];
         time_best = NaN;
     end
+    
+    save_index
 
     q_max = floor(N_train/3); % Max q when Hankel is a square
     
     % Grid search for best params: p,q for each N_train
+    q_search = q_min:q_increment:q_max; % List of q parameters to search in
     for q = q_search
 
 %     %  Random search for best hyperparameters
@@ -135,13 +137,13 @@ for index = 1:length(N_train_list) % Loop through N_train_list
         Omega = [X; Upsilon]; % Omega is concatination of Y and Upsilon
 
         % Step 2: Compute the SVD of the input space Omega
-        [U,S,V] = svd(Omega, 'econ');
+        [U1,S1,V1] = svd(Omega, 'econ');
         %         figure, semilogy(diag(S), 'x'), hold on;
         %         title('Singular values of Omega, showing p truncation')
         %         plot(p,S(p,p), 'ro'), hold off;
 
         % Step 3: Compute the SVD of the output space X'
-        [U,S,V] = svd(X2, 'econ');
+        [U2,S2,V2] = svd(X2, 'econ');
         %         figure, semilogy(diag(S), 'x'), hold on;
         %         title('Singular values of X2, showing r truncation')
         %         plot(r,S(r,r), 'ro'), hold off;
@@ -164,16 +166,16 @@ for index = 1:length(N_train_list) % Loop through N_train_list
             % Do here so SVD is performed only once per q in Grid search
             
             % Truncate SVD matrixes of Omega
-            U_tilde = U(:, 1:p); 
-            S_tilde = S(1:p, 1:p);
-            V_tilde = V(:, 1:p);
+            U_tilde = U1(:, 1:p); 
+            S_tilde = S1(1:p, 1:p);
+            V_tilde = V1(:, 1:p);
             U1_tilde = U_tilde(1:q*m, :);
             U2_tilde = U_tilde(q*m+1:end, :);
 
             % Truncate SVD matrixes of X2
-            U_hat = U(:, 1:r); 
-            S_hat = S(1:r, 1:r);
-            V_hat = V(:, 1:r);
+            U_hat = U2(:, 1:r); 
+            S_hat = S2(1:r, 1:r);
+            V_hat = V2(:, 1:r);
 
             % Step 4: Compute the approximation of the operators G = [A B]
             A_tilde = U_hat'*X2*V_tilde/(S_tilde)*U1_tilde'*U_hat;
@@ -219,7 +221,6 @@ for index = 1:length(N_train_list) % Loop through N_train_list
             time = time_q + toc(timer_p); % Add time taken in q loop before p chosen
 
             % x_augmented(k+1) = A*x_aug(k) + B*u(k)
-            % Ignore eigenmodes Step 5 and 6
 
             %% Compare to testing data
             % Initial condition
@@ -246,10 +247,16 @@ for index = 1:length(N_train_list) % Loop through N_train_list
                 q_best = q;
                 time_best = time;
                 
-                % ?????????
-                problem if saved data was not loaded, then also save_index = -1
-                
-                if save_index == -1 % If no other data saved for N_train
+                if save_index == -2 % If no saved data file exists
+                    N_train_saved = [N_train];
+                    MAE_saved = [MAE_best];
+                    p_saved = [p_best];
+                    q_saved = [q_best];
+                    time_saved = [time_best];
+                    
+                    save_index = 1; % save_index now has a positive value
+                    
+                elseif save_index == -1 % If first data for N_train
                     % Insert data in correct place
                     if N_train < N_train_saved(end)
                         for save_index = 1:length(N_train_saved)
@@ -271,19 +278,22 @@ for index = 1:length(N_train_list) % Loop through N_train_list
                         q_saved = [q_saved, q_best];
                         time_saved = [time_saved, time_best];
                         
-                        save_index = length(N_train_saved); % save_index now has a value
+                        save_index = length(N_train_saved); % save_index now has a positive value
                     end
 
                     
                 else % Replace previous saved data for N_train
                 
-                    MAE_saved(save_index) = MAE_best;
+                    MAE_saved(:,save_index) = MAE_best;
                     p_saved(save_index) = p_best;
                     q_saved(save_index) = q_best;
                     time_saved(save_index) = time_best;
                     
                 end
                 
+                % Save results
+                save('Data\N_train_error_time_HAVOK_sig=0.mat', 'N_train_saved', 'MAE_saved', 'p_saved', 'q_saved', 'time_saved');
+
             end
 
             % %% Compare to training data
@@ -338,72 +348,6 @@ for index = 1:length(N_train_list) % Loop through N_train_list
     
 end
 
-%% Merge new and saved results
-% If two results are for the same N_train, keep the one with the smallest error
-try
-    load('Data\N_train_error_time_HAVOK_sig=0.mat');
-catch
-    disp('No saved results to compare to')
-    N_train_saved = N_train_list;
-    MAE_saved = MAE_list;
-    p_saved = p_list;
-    q_saved = q_list;
-    time_saved = time_list;
-end
-% 
-% saved = [N_train_saved', mean(MAE_saved',2)]
-% list = [N_train_list', mean(MAE_list', 2)]
-
-li = 1; % List index
-si = 1; % Saved index
-
-for k=1:1e10 % Basically while true
-    if N_train_list(li) < N_train_saved(si) % list smaller
-        N_train_saved   = insert(N_train_saved, si, N_train_list(li));
-        MAE_saved       = insert(MAE_saved, si, MAE_list(:,li));
-        p_saved         = insert(p_saved, si, p_list(li));
-        q_saved         = insert(q_saved, si, q_list(li));
-        time_saved      = insert(time_saved, si, time_list(li));
- 
-        si = si+1; % increment indices
-        li = li+1;
-    
-    elseif N_train_list(li) == N_train_saved(si) % list equal
-        if mean(MAE_list(:,li)) < mean(MAE_saved(:,si)) % If list has smaller MAE
-            MAE_saved(:,si) = MAE_list(:,li);
-            p_saved(si) = p_list(li);
-            q_saved(si) = q_list(li);
-            time_saved(si) = time_list(li);
-        end
-        
-        si = si+1; % Increment indices
-        li = li+1;
-    
-    else % list bigger
-        si = si+1; % Keep comparing current li, only increment si
-    end
-    
-    s_max = length(N_train_saved);
-    l_max = length(N_train_list);
-    
-    if li > l_max % If all items in list checked
-        break; 
-    
-    elseif si > s_max % If all in saved compared already
-        N_train_saved = [N_train_saved, N_train_list(li:end)]; % Append rest of list to saved
-        MAE_saved = [MAE_saved, MAE_list(:, li:end)]; % Append rest of list to saved
-        p_saved = [p_saved, p_list(li:end)]; 
-        q_saved = [q_saved, q_list(li:end)]; % Append rest of list to saved
-        time_saved = [time_saved, time_list(li:end)]; % Append rest of list to saved   
-        break;
-    end
-    
-end
-
-new_saved = [N_train_saved', mean(MAE_saved', 2)]
-
-% Save the results to append to later
-save('Data\N_train_error_time_HAVOK_sig=0.mat', 'N_train_saved', 'MAE_saved', 'p_saved', 'q_saved', 'time_saved');
 
 %%
 figure(1), plot(N_train_saved,MAE_saved(1,:)), title('MAE x vs N-train')
@@ -412,7 +356,7 @@ figure(3), plot(N_train_saved,p_saved), title('p vs N-train')
 figure(4), plot(N_train_saved,q_saved), title('q vs N-train')
 figure(5), plot(N_train_saved,time_saved), title('time vs N-train')
 
-toc;
+toc(total_timer);
 disp('------------')
 disp('END of HAVOK')
 
