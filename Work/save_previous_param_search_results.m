@@ -21,6 +21,11 @@ try
     load('Data\N_train_error_time_HAVOK_sig=0.mat');
 catch
     disp('No saved results to compare to')
+    N_train_saved = N_train_list;
+    MAE_saved = MAE_list;
+    p_saved = p_list;
+    q_saved = q_list;
+    time_saved = time_list;
 end
 % 
 % saved = [N_train_saved', mean(MAE_saved',2)]
@@ -76,6 +81,12 @@ end
 
 % Save the results to append to later
 save('Data\N_train_error_time_HAVOK_sig=0.mat', 'N_train_saved', 'MAE_saved', 'p_saved', 'q_saved', 'time_saved');
+%%
+figure(1), plot(N_train_saved,MAE_saved(1,:)), title('MAE x vs N-train')
+figure(2), plot(N_train_saved,MAE_saved(2,:)), title('MAE theta vs N-train')
+figure(3), plot(N_train_saved,p_saved), title('p vs N-train')
+figure(4), plot(N_train_saved,q_saved), title('q vs N-train')
+figure(5), plot(N_train_saved,time_saved), title('time vs N-train')
 
 % bar(mean(MAE_saved',2))
 
