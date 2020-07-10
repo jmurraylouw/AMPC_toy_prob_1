@@ -33,15 +33,17 @@ c = 1; % Column spacing of Hankel matrix (for multiscale dynamics)
 d = 1; % Row spacing of Hankel matrix (for multiscale dynamics)
 % N_train; % Num of data samples for training, rest for testing
 % w; % (named 'p' in Multiscale paper) number of columns in Hankel matrix
-N_train_min = 10/Ts; % Minimum length of training data
-N_train_max = 50/Ts; % Maximum length of training data
+N_train_min = 20/Ts; % Minimum length of training data
+N_train_max = 30/Ts; % Maximum length of training data
 max_iterations = 1000; % Maximum number of iterations allowed in Random search
 % p = 34; % Truncated rank of system
-p_min = 20; % Min value of p in Random search
-p_max = 40; % Max value of p in Random search
+p_min = 25; % Min value of p in Random search
+p_max = 35; % Max value of p in Random search
 % q = 1000; % number of delays
-q_min = 50; % Min value of q in Random search
+q_min = 80; % Min value of q in Random search
 % q_max; % Max value of q in Random search
+q_increment = 2; % Increment value of q in Grid search
+p_increment = 2; % Increment value of p in Grid search
 
 % Add noise once
 y_data_noise = y_data + sigma*randn(size(y_data));
@@ -53,7 +55,10 @@ p_list = -1 + zeros(1,length(N_train_list)); % Save p of best MAE for each N_tra
 q_list = -1 + zeros(1,length(N_train_list)); % Save q of best MAE for each N_train
 time_list = -1 + zeros(1,length(N_train_list)); % Save time taken for each N_train
 
-% Loop through different training lengths
+% Number of iterations predicted
+num_iterations = (p_max - p_min)/p_increment*((N_train_max+N_train_min)/4 - q_min)/q_increment*length(N_train_list)
+
+%% Loop through different training lengths
 for index = 1:length(N_train_list) % Loop through N_train_list
     % index is used to relate all the lists to N_train_list
     N_train = N_train_list(index); 
@@ -62,15 +67,21 @@ for index = 1:length(N_train_list) % Loop through N_train_list
     q_best = NaN;
     MAE_best = Inf*[1;1];
 
-%     q_max = floor(N_train/2); % Max q when Hankel is a square
-%     for q = 
-    Random search for best hyperparameters
-    for iteration = 1:max_iterations % Loop truncateed rank
+    q_max = floor(N_train/3); % Max q when Hankel is a square
+    
+    % Grid search for best params: p,q for each N_train
+    for q = q_min:q_increment:q_max
+    for p = p_min:p_increment:p_max
+        
         timer = tic; % Start timer for this model evaluation
         
-        q_max = floor(N_train/2); % Max q when Hankel is a square
-        q = randi([q_min, q_max]); % Scaled to get better uniform distribution
-        p = randi([p_min, p_max]);
+%     %  Random search for best hyperparameters
+%     for iteration = 1:max_iterations % Loop truncateed rank
+%         timer = tic; % Start timer for this model evaluation
+%         
+%         q_max = floor(N_train/2); % Max q when Hankel is a square
+%         q = randi([q_min, q_max]); % Scaled to get better uniform distribution
+%         p = randi([p_min, p_max]);
         
         w = N_train - q; % num columns of Hankel matrix
         
@@ -165,7 +176,7 @@ for index = 1:length(N_train_list) % Loop through N_train_list
         B = U_hat*B_tilde;
 
         if (sum(abs(eig(A)) > 1) ~= 0) % If some eigenvalues are unstable due to machine tolerance
-            disp('Still unstable eigenvalues')
+%             disp('Still unstable eigenvalues')
             break;
         end
 
@@ -233,7 +244,8 @@ for index = 1:length(N_train_list) % Loop through N_train_list
         % 
         % toc;
 
-    end
+    end % end of p loop
+    end % end of q loop
 
     MAE_list(:,index) = MAE_best; % Save best MAE related to current N_train
     p_list(:,index) = p_best;
