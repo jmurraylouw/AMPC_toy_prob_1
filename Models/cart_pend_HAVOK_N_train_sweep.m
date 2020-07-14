@@ -13,8 +13,10 @@ load('cartpend_random_1.mat') % Load simulation data
 u_data  = out.u.Data';
 x_data  = out.x.Data';
 y_data  = x_data([1,3],:); % Measurement data (x and theta)
+t       = out.tout'; % Time
 
 % Testing data - Last 50 s is for testing and one sample overlaps training 
+N_test = 5000; % Num of data samples for testing
 y_test = y_data(:,end-N_test+1:end); % One sample of testing data overlaps for initial condition
 u_test = u_data(:,end-N_test+1:end);
 t_test = t(:,end-N_test+1:end);
@@ -34,41 +36,42 @@ N  = length(t);     % Number of data samples
 % Very dependant on choice of p, r, q
 
 sigma = 0.0; % Noise standard deviation
-N_test = 5000; % Num of data samples for testing
 c = 1; % Column spacing of Hankel matrix (for multiscale dynamics)
 d = 1; % Row spacing of Hankel matrix (for multiscale dynamics)
 % N_train; % Num of data samples for training, rest for testing
 % w; % (named 'p' in Multiscale paper) number of columns in Hankel matrix
-N_train_min = 10.5/Ts; % Minimum length of training data
-N_train_max = 49.5/Ts; % Maximum length of training data
+N_train_min = 1/Ts; % Minimum length of training data
+N_train_max = 50/Ts; % Maximum length of training data
 % p = Truncated rank of system of Omega
 % r = Truncated rank of system of X2
 % q = number of delays
-p_min = 4; % Min value of p in Random search
-p_max = 200; % Max value of p in Random search
+p_min = 8; % Min value of p in Random search
+p_max = 8; % Max value of p in Random search
 q_min = 4; % Min value of q in Random search
-q_max = 500; % Max value of q in Random search
-q_increment = 10; % Increment value of q in Grid search
-p_increment = 2; % Increment value of p in Grid search
-N_train_increment = 100; % Increment value of N_train in Grid search
+q_max = 4; % Max value of q in Random search
+q_increment = 1; % Increment value of q in Grid search
+p_increment = 1; % Increment value of p in Grid search
+N_train_increment = 10; % Increment value of N_train in Grid search
 
+N_train_list = N_train_min:N_train_increment:N_train_max;
 q_search = q_min:q_increment:q_max; % List of q parameters to search in
 
 % Add noise once
+rng('default');
+rng(1); % Repeatable random numbers
 y_data_noise = y_data + sigma*randn(size(y_data));
-
-% Lists to save results for different N_train
-N_train_list = N_train_min:N_train_increment:N_train_max; % List of N_train to compute model for
-MAE_list = Inf + zeros(m,length(N_train_list)); % Save best MAE for each N_train
-p_list = -1 + zeros(1,length(N_train_list)); % Save p of best MAE for each N_train
-q_list = -1 + zeros(1,length(N_train_list)); % Save q of best MAE for each N_train
-time_list = -1 + zeros(1,length(N_train_list)); % Save time taken for each N_train
 
 % Number of iterations predicted
 num_iterations = (p_max - p_min)/p_increment*((N_train_max+N_train_min)/4 - q_min)/q_increment*length(N_train_list)
 
+%% Load saved results
+
+model_name = 'HAVOK'; % Name of prediction model
+sig_str = strrep(num2str(sigma),'.','_'); % Convert sigma value to string
+save_file = ['Data\N_train_error_time_', model_name, '_sig=', sig_str, '.mat'];
+
 try
-    load('Data\N_train_error_time_HAVOK_sig=0.mat');
+    load(save_file);
 catch
     disp('No saved results to compare to')  
     N_train_saved = [];
@@ -238,11 +241,13 @@ for index = 1:length(N_train_list) % Loop through N_train_list
             % Vector of Mean Absolute Error on testing data
             MAE = sum(abs(y_hat - y_test), 2)./N_test; % For each measured state
 
+            % If found best result yet, save it
             if mean(MAE) < mean(MAE_best)
-                MAE_best = MAE
+                disp('Found better params:')
+                MAE_best = MAE;
                 p_best = p
                 q_best = q
-                time_best = time
+                time_best = time;
                 
                 if isempty(N_train_saved) % If no saved data file existed
                     N_train_saved = [N_train];
@@ -290,52 +295,13 @@ for index = 1:length(N_train_list) % Loop through N_train_list
                 end
                 
                 % Save results
-                save('Data\N_train_error_time_HAVOK_sig=0.mat', 'N_train_saved', 'MAE_saved', 'p_saved', 'q_saved', 'time_saved');
+                save(save_file, 'N_train_saved', 'MAE_saved', 'p_saved', 'q_saved', 'time_saved');
             end
-
-            % %% Compare to training data
-            % disp(6)
-            % % Initial conditions
-            % y_hat_02 = zeros(q*m,1);
-            % for row = 0:q-1 % Create first column of spaced Hankel matrix
-            %     y_hat_02(row*m+1:(row+1)*m, 1) = y_train(:, row*d + 1);
-            % end
-            % k_start = row*d + 1; % First k to start at
-            % 
-            % Y_hat2 = zeros(length(y_hat_0),N_train); % ??? Estimated X from model
-            % Y_hat2(:,k_start) = y_hat_02; % Initial conditions, insert at first k
-            % for k = k_start:N_train-1
-            %     Y_hat2(:,k+1) = A*Y_hat2(:,k) + B*u_train(:,k);
-            % end
-            % y_hat2 = Y_hat2(end-m+1:end, :); % Extract only non-delay time series (last m rows)
-            % 
-            % disp('Run model on training data')
-
-            % %% Plot data vs model
-            % figure;
-            % plot(t, y_data); 
-            % hold on;
-            % plot(t, u_data, ':', 'LineWidth', 1);
-            % plot(t_test, y_hat, '--', 'LineWidth', 1); % Plot only non-delay coordinate
-            % plot(t_train, y_hat2, '--', 'LineWidth', 1); % Plot only non-delay coordinate  
-            % plot((D + t(N-N_test-N_train)).*[1,1], ylim, 'r');
-            % plot(t(N-N_test-N_train).*[1,1], ylim, 'r');
-            % plot(t(N-N_test).*[1,1], ylim, 'k');
-            % title('Training and Testing data vs Model');
-            % % legend('x', 'theta', 'input', 'x_hat', 'theta_hat', 'D', 't(final sample)')
-            % hold off;
-            % 
-            % toc;
 
         end % end of p loop
     
     end % end of q loop
-
-    MAE_list(:,index) = MAE_best; % Save best MAE related to current N_train
-    p_list(:,index) = p_best;
-    q_list(:,index) = q_best;
-    time_list(:,index) = time_best; % Save time taken to compute model for each N_train
-      
+   
     disp('Results:')
     MAE_best
     p_best
@@ -346,17 +312,25 @@ for index = 1:length(N_train_list) % Loop through N_train_list
 end
 
 
-%%
+%% Plot saved results
 disp('Plotting...')
-figure(1), plot(N_train_saved,MAE_saved(1,:)), title('MAE x vs N-train')
-figure(2), plot(N_train_saved,MAE_saved(2,:)), title('MAE theta vs N-train')
+close all;
+figure(1), semilogy(N_train_saved,MAE_saved(1,:)), title('MAE x vs N-train')
+figure(2), semilogy(N_train_saved,MAE_saved(2,:)), title('MAE theta vs N-train')
 figure(3), plot(N_train_saved,p_saved), title('p vs N-train')
 figure(4), plot(N_train_saved,q_saved), title('q vs N-train')
 figure(5), plot(N_train_saved,time_saved), title('time vs N-train')
 
+figure(6)
+p_table = tabulate(p_saved);
+subplot(1,2,1), bar(p_table(:,1), p_table(:,2)), title('Frequency of p');
+q_table = tabulate(q_saved);
+subplot(1,2,2), bar(q_table(:,1), q_table(:,2)), title('Frequency of q');
+
+
 toc(total_timer);
-disp('------------')
-disp('END of HAVOK')
+disp('--------------------------')
+disp('END of HAVOK N_train sweep')
 
 
 %% Local functions
