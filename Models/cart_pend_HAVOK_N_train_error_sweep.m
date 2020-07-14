@@ -1,6 +1,6 @@
-%% HAVOK with control - of cart pendulum
-% Estimate linear model from data
-% Partial state feedback
+%% HAVOK N_train vs error sweep with grid search for parameters
+% HAVOK with control - of cart pendulum
+% Sweep through different N_train, find best parameters and calculate error
 
 %% Try to save previous results of random search and continue with them
 
@@ -68,7 +68,7 @@ num_iterations = (p_max - p_min)/p_increment*((N_train_max+N_train_min)/4 - q_mi
 
 model_name = 'HAVOK'; % Name of prediction model
 sig_str = strrep(num2str(sigma),'.','_'); % Convert sigma value to string
-save_file = ['Data\N_train_error_time_', model_name, '_sig=', sig_str, '.mat'];
+save_file = ['Data\', model_name, '_N_train_vs_error', '_sig=', sig_str, '.mat'];
 
 try
     load(save_file);
@@ -214,6 +214,7 @@ for index = 1:length(N_train_list) % Loop through N_train_list
             B = U_hat*B_tilde;
 
             if (sum(abs(eig(A)) > 1) ~= 0) % If eigenvalues are unstable
+                disp('Unstable')
                 break; % Exit this p loop if still unstable
             end
 
@@ -244,6 +245,7 @@ for index = 1:length(N_train_list) % Loop through N_train_list
             % If found best result yet, save it
             if mean(MAE) < mean(MAE_best)
                 disp('Found better params:')
+                
                 MAE_best = MAE;
                 p_best = p
                 q_best = q

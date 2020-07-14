@@ -5,10 +5,12 @@
 %% Try to save previous results of random search and continue with them
 
 %% Read data
-total_timer = tic;
 
 close all;
 clear all;
+
+total_timer = tic;
+
 load('cartpend_random_1.mat') % Load simulation data
 % x0 = [1; -0.2; -0.5; 0.8]
 u_data  = out.u.Data';
@@ -37,7 +39,7 @@ N  = length(t);     % Number of data samples
 % Very dependant on choice of p, r, q
 
 sigma = 0.0; % Noise standard deviation
-N_train = 1000; % Number of sampels in training data
+N_train = 130; % Number of sampels in training data
 c = 1; % Column spacing of Hankel matrix (for multiscale dynamics)
 d = 1; % Row spacing of Hankel matrix (for multiscale dynamics)
 % w; % (named 'p' in Multiscale paper) number of columns in Hankel matrix
@@ -53,7 +55,7 @@ y_data_noise = y_data + sigma*randn(size(y_data));
 %% Load saved results
 model_name = 'HAVOK'; % Name of prediction model
 sig_str = strrep(num2str(sigma),'.','_'); % Convert sigma value to string
-save_file = ['Data\N_train_error_time_', model_name, '_sig=', sig_str, '.mat'];
+save_file = ['Data\', model_name, '_N_train_vs_error', '_sig=', sig_str, '.mat'];
 
 try
     load(save_file);
@@ -65,18 +67,18 @@ try
         q = q_saved(save_index)
         time = time_saved(save_index)
         
-%         % Override
-%         disp('Override')
-%         q = 4
-%         p = 8
+        % Override
+        disp('Override')
+        q = 50
+        p = 10
 
     else
         N_train
         disp('No saved results for this N_train value')
         
-        disp('Override')
-        q = 4
-        p = 8
+%         disp('Override')
+%         q = 4
+%         p = 8
     end
     
 catch
