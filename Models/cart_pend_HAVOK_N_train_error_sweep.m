@@ -72,6 +72,7 @@ predicted_hours = mean(time_saved)*num_iterations/3600
 model_name = 'HAVOK'; % Name of prediction model
 sig_str = strrep(num2str(sigma),'.','_'); % Convert sigma value to string
 save_file = ['Data\', model_name, '_N_train_vs_error', '_sig=', sig_str, '.mat'];
+search_space_file = ['Data\', model_name, '_search_space_sig=', sig_str, '.mat'];
 
 try
     load(save_file);
