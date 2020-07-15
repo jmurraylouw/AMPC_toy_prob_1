@@ -30,12 +30,16 @@ for index = 1:length(N_train_list)
         N_train_i = length(N_train_record)+1; % q index becomes next in list
     end
     
+    %% only in N_train
+    
     %% for q
     for q = q_search
         q_i = find(q_record == q); % index of q in search_space
         if isempty(q_i) % If q not in record list
             q_i = length(q_record)+1; % q index becomes next in list
         end
+        
+        %% only in q
         
         %% for p
         for p = p_search
@@ -57,7 +61,8 @@ for index = 1:length(N_train_list)
             end
             
             if new_search
-                %% Do p calculations...
+                
+                %% only in p
                 
                 %% Record search
                 search_space(N_train_i, q_i, p_i) = scaled_MAE;
