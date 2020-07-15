@@ -35,26 +35,29 @@ N  = length(t);     % Number of data samples
 %% Parameters
 % Very dependant on choice of p, r, q
 
-sigma = 0.0; % Noise standard deviation
+sigma = 0.01; % Noise standard deviation
 c = 1; % Column spacing of Hankel matrix (for multiscale dynamics)
 d = 1; % Row spacing of Hankel matrix (for multiscale dynamics)
 % N_train; % Num of data samples for training, rest for testing
 % w; % (named 'p' in Multiscale paper) number of columns in Hankel matrix
-N_train_min = 1/Ts; % Minimum length of training data
-N_train_max = 50/Ts; % Maximum length of training data
 % p = Truncated rank of system of Omega
 % r = Truncated rank of system of X2
 % q = number of delays
-p_min = 8; % Min value of p in Random search
-p_max = 8; % Max value of p in Random search
-q_min = 4; % Min value of q in Random search
-q_max = 4; % Max value of q in Random search
+N_train_min = 1000; % Minimum length of training data
+N_train_max = 4000; % Maximum length of training data
+N_train_increment = 100; % (% Minimum incr = 100) Increment value of N_train in Grid search
+
+q_min = 60; % Min value of q in Random search
+q_max = 80; % Max value of q in Random search
 q_increment = 1; % Increment value of q in Grid search
+
+p_min = 15; % Min value of p in Random search
+p_max = 25; % Max value of p in Random search
 p_increment = 1; % Increment value of p in Grid search
-N_train_increment = 10; % Increment value of N_train in Grid search
 
 N_train_list = N_train_min:N_train_increment:N_train_max;
 q_search = q_min:q_increment:q_max; % List of q parameters to search in
+% p_search defined before p for loop
 
 % Add noise once
 rng('default');
@@ -63,7 +66,7 @@ y_data_noise = y_data + sigma*randn(size(y_data));
 
 % Number of iterations predicted
 num_iterations = (p_max - p_min)/p_increment*((N_train_max+N_train_min)/4 - q_min)/q_increment*length(N_train_list)
-
+predicted_hours = mean(time_saved)*num_iterations/3600
 %% Load saved results
 
 model_name = 'HAVOK'; % Name of prediction model
@@ -76,6 +79,7 @@ catch
     disp('No saved results to compare to')  
     N_train_saved = [];
 end
+
 
 %% Loop through different training lengths
 for index = 1:length(N_train_list) % Loop through N_train_list
@@ -154,8 +158,11 @@ for index = 1:length(N_train_list) % Loop through N_train_list
         
         time_q = toc(timer_q); % record time for first part in q loop
         
-        % Grid search: Search through these p values for current q    
-        p_search = p_min:p_increment:min([p_max,q*m]); % List of p to search, for every q
+        % Grid search: Search through these p values for current q
+        % May not exceed hard p_max, and width of U1 and width of U2 for r
+        p_max_new = min([p_max, size(U1,2), size(U2,2)+l]); 
+        p_search = p_min:p_increment:p_max_new; % List of p to search, for every q
+        %% ??? remove p's from p_seacrh (for current q and N_train) that have been searched already
         for p = p_search
             
             timer_p = tic; % start timer of part in p loop
@@ -196,7 +203,6 @@ for index = 1:length(N_train_list) % Loop through N_train_list
                 A_old = A_tilde;
                 A_tilde = real(A_tilde);
                 if(count>10)
-                    'break'
                     break
                 end
             end
@@ -214,7 +220,7 @@ for index = 1:length(N_train_list) % Loop through N_train_list
             B = U_hat*B_tilde;
 
             if (sum(abs(eig(A)) > 1) ~= 0) % If eigenvalues are unstable
-                disp('Unstable')
+%                 disp('Unstable')
                 break; % Exit this p loop if still unstable
             end
 
@@ -242,13 +248,21 @@ for index = 1:length(N_train_list) % Loop through N_train_list
             % Vector of Mean Absolute Error on testing data
             MAE = sum(abs(y_hat - y_test), 2)./N_test; % For each measured state
 
+            % MAE metrics scaled according to range of state and average
+            % taken over all states
+            scaled_MAE = mean(MAE./(max(y_test,[],2) - min(y_test,[],2)));
+            scaled_MAE_best = mean(MAE_best./(max(y_test,[],2) - min(y_test,[],2)));
+            
             % If found best result yet, save it
-            if mean(MAE) < mean(MAE_best)
-                disp('Found better params:')
+            % ???????? compare with other metric.
+            % MAE x outweighs MAE theta.
+            % Use metric compensated for size.
+            if scaled_MAE < scaled_MAE_best
+%                 disp('Found better params:')
                 
                 MAE_best = MAE;
-                p_best = p
-                q_best = q
+                p_best = p;
+                q_best = q;
                 time_best = time;
                 
                 if isempty(N_train_saved) % If no saved data file existed
