@@ -39,7 +39,7 @@ N  = length(t);     % Number of data samples
 % Very dependant on choice of p, r, q
 
 sigma = 0.01; % Noise standard deviation
-N_train = 2010; % Number of sampels in training data
+N_train = 1100; % Number of sampels in training data
 c = 1; % Column spacing of Hankel matrix (for multiscale dynamics)
 d = 1; % Row spacing of Hankel matrix (for multiscale dynamics)
 % w; % (named 'p' in Multiscale paper) number of columns in Hankel matrix

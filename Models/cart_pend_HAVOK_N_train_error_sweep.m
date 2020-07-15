@@ -44,15 +44,15 @@ d = 1; % Row spacing of Hankel matrix (for multiscale dynamics)
 % r = Truncated rank of system of X2
 % q = number of delays
 N_train_min = 1000; % Minimum length of training data
-N_train_max = 4000; % Maximum length of training data
+N_train_max = 1400; % Maximum length of training data
 N_train_increment = 100; % (% Minimum incr = 100) Increment value of N_train in Grid search
 
 q_min = 60; % Min value of q in Random search
-q_max = 80; % Max value of q in Random search
+q_max = 62; % Max value of q in Random search
 q_increment = 1; % Increment value of q in Grid search
 
 p_min = 15; % Min value of p in Random search
-p_max = 25; % Max value of p in Random search
+p_max = 16; % Max value of p in Random search
 p_increment = 1; % Increment value of p in Grid search
 
 N_train_list = N_train_min:N_train_increment:N_train_max;
@@ -64,23 +64,35 @@ rng('default');
 rng(1); % Repeatable random numbers
 y_data_noise = y_data + sigma*randn(size(y_data));
 
-% Number of iterations predicted
-num_iterations = (p_max - p_min)/p_increment*((N_train_max+N_train_min)/4 - q_min)/q_increment*length(N_train_list)
-predicted_hours = mean(time_saved)*num_iterations/3600
 %% Load saved results
-
 model_name = 'HAVOK'; % Name of prediction model
 sig_str = strrep(num2str(sigma),'.','_'); % Convert sigma value to string
 save_file = ['Data\', model_name, '_N_train_vs_error', '_sig=', sig_str, '.mat'];
-search_space_file = ['Data\', model_name, '_search_space_sig=', sig_str, '.mat'];
 
 try
     load(save_file);
 catch
     disp('No saved results to compare to')  
     N_train_saved = [];
+    time_saved = 0.01;
 end
 
+% Number of iterations predicted
+num_iterations = (p_max - p_min)/p_increment*((N_train_max+N_train_min)/4 - q_min)/q_increment*length(N_train_list)
+predicted_hours = mean(time_saved)*num_iterations/3600
+
+%% Load search space records
+search_space_file = ['Data\', model_name, '_search_space_sig=', sig_str, '.mat'];
+
+try
+    load(search_space_file);
+catch
+    disp('No search space file')
+    N_train_record = [];
+    q_record = [];
+    p_record = [];    
+    search_space = zeros(0, 0, 0);
+end
 
 %% Loop through different training lengths
 for index = 1:length(N_train_list) % Loop through N_train_list
@@ -89,6 +101,12 @@ for index = 1:length(N_train_list) % Loop through N_train_list
     N_train = N_train_list(index)
     disp('searching...')
 
+    % Get index for search space records
+    N_train_i = find(N_train_record == N_train); % index of N_train in search_space
+    if isempty(N_train_i) % If N_train not in record list
+        N_train_i = length(N_train_record)+1; % q index becomes next in list
+    end
+    
     % Training data - Last sample of training is first sample of testing
     y_train = y_data_noise(:,end-N_test-N_train+2:end-N_test+1); % Use noisy data
     u_train = u_data(:,end-N_test-N_train+2:end-N_test+1);
@@ -109,18 +127,16 @@ for index = 1:length(N_train_list) % Loop through N_train_list
         q_best = NaN;
         time_best = NaN;
     end
-
-%     q_max = floor(N_train/3); % Max q when Hankel is a square
     
     % Grid search for best params: p,q for each N_train
     for q = q_search
 
-%     %  Random search for best hyperparameters
-%     for iteration = 1:max_iterations % Loop truncateed rank         
-%         q_max = floor(N_train/2); % Max q when Hankel is a square
-%         q = randi([q_min, q_max]); % Scaled to get better uniform distribution
-%         p = randi([p_min, p_max]);
-
+        % Get index for search space records
+        q_i = find(q_record == q); % index of q in search_space
+        if isempty(q_i) % If q not in record list
+            q_i = length(q_record)+1; % q index becomes next in list
+        end
+        
         timer_q = tic; % Start timer for this model evaluation
         w = N_train - q; % num columns of Hankel matrix
 
@@ -163,161 +179,208 @@ for index = 1:length(N_train_list) % Loop through N_train_list
         % May not exceed hard p_max, and width of U1 and width of U2 for r
         p_max_new = min([p_max, size(U1,2), size(U2,2)+l]); 
         p_search = p_min:p_increment:p_max_new; % List of p to search, for every q
-        %% ??? remove p's from p_seacrh (for current q and N_train) that have been searched already
+
         for p = p_search
             
-            timer_p = tic; % start timer of part in p loop
+           
+            % Get index for search space records
+            p_i = find(p_record == p); % index of p in search_space
+            if isempty(p_i) % If p not in record list
+                p_i = length(p_record)+1; % q index becomes next in list
+            end            
+ 
+            % debug
+            if p_i == 2 && N_train_i == 2
+                disp(2)
+            end
+ 
             
-            r = p-l; % Reduced rank of X2 svd, r < p, (minus number of inputs from rank)
-
-            % Step 2.5 and 3.5: Truncate SVD matrixes with p and r
-            % Do here so SVD is performed only once per q in Grid search
-            
-            % Truncate SVD matrixes of Omega
-            U_tilde = U1(:, 1:p); 
-            S_tilde = S1(1:p, 1:p);
-            V_tilde = V1(:, 1:p);
-            U1_tilde = U_tilde(1:q*m, :);
-            U2_tilde = U_tilde(q*m+1:end, :);
-
-            % Truncate SVD matrixes of X2
-            U_hat = U2(:, 1:r); 
-            S_hat = S2(1:r, 1:r);
-            V_hat = V2(:, 1:r);
-
-            % Step 4: Compute the approximation of the operators G = [A B]
-            A_tilde = U_hat'*X2*V_tilde/(S_tilde)*U1_tilde'*U_hat;
-            B_tilde = U_hat'*X2*V_tilde/(S_tilde)*U2_tilde';
-%             if (sum(abs(eig(A_tilde)) > 1) ~= 0) % If some eigenvalues are unstable due to machine tolerance
-%                  disp('Unstable eigenvalues')
-%             end
-
-            % If some eigenvalues are unstable due to machine tolerance,
-            % Scale them to be stable
-            count = 0;
-            while (sum(abs(eig(A_tilde)) > 1) ~= 0) 
-                count = count+1;
-                [Ve,De] = eig(A_tilde);
-                unstable = abs(De)>1; % indexes of unstable eigenvalues
-                De(unstable) = De(unstable)./abs(De(unstable)) - 10^(-16+count); % Normalize all unstable eigenvalues (set abs(eig) = 1)
-                A_tilde = Ve*De/(Ve); % New A with margininally stable eigenvalues
-                A_old = A_tilde;
-                A_tilde = real(A_tilde);
-                if(count>10)
-                    break
+            try
+                MAE_record = search_space(N_train_i, q_i, p_i);
+                if MAE_record == 0 % Zero error means unsearched
+                    new_search = 1; % 1 = first time searching this param combo
+                else
+                    new_search = 0; % 0 = has been searched before
                 end
+            catch % Catch index out of bounds
+                new_search = 1; % 1 = first time searching this param combo
             end
             
-            if (sum(abs(eig(A_tilde)) > 1) ~= 0) % If tilde eigenvalues are still unstable
-                break; % Exit this p loop if still unstable
-            end
-            
-            % x_tilde(k+1) = A_tilde*x_tilde(k) + B_tilde*u(k)
-            % x = U_hat*x_tilde, Transform to original coordinates
-            % x_tilde = U_hat'*x, Transform to reduced order coordinates
-            % Here x is augmented state
+            if new_search
 
-            A = U_hat*A_tilde*U_hat';
-            B = U_hat*B_tilde;
+                timer_p = tic; % start timer of part in p loop
 
-            if (sum(abs(eig(A)) > 1) ~= 0) % If eigenvalues are unstable
-%                 disp('Unstable')
-                break; % Exit this p loop if still unstable
-            end
+                r = p-l; % Reduced rank of X2 svd, r < p, (minus number of inputs from rank)
 
-            % Time taken to train this model
-            time = time_q + toc(timer_p); % Add time taken in q loop before p chosen
+                % Step 2.5 and 3.5: Truncate SVD matrixes with p and r
+                % Do here so SVD is performed only once per q in Grid search
 
-            % x_augmented(k+1) = A*x_aug(k) + B*u(k)
+                % Truncate SVD matrixes of Omega
+                U_tilde = U1(:, 1:p); 
+                S_tilde = S1(1:p, 1:p);
+                V_tilde = V1(:, 1:p);
+                U1_tilde = U_tilde(1:q*m, :);
+                U2_tilde = U_tilde(q*m+1:end, :);
 
-            %% Compare to testing data
-            % Initial condition
-            y_hat_0 = zeros(q*m,1);
-            for row = 0:q-1 % First column of spaced Hankel matrix
-                y_hat_0(row*m+1:(row+1)*m, 1) = y_train(:, end - ((q-1)*d+1) + row*d + 1);
-            end
+                % Truncate SVD matrixes of X2
+                U_hat = U2(:, 1:r); 
+                S_hat = S2(1:r, 1:r);
+                V_hat = V2(:, 1:r);
 
-            % Run model
-            Y_hat = zeros(length(y_hat_0),N_test); % Empty estimated Y
-            Y_hat(:,1) = y_hat_0; % Initial condition
-            for k = 1:N_test-1
-                Y_hat(:,k+1) = A*Y_hat(:,k) + B*u_test(:,k);
-            end
+                % Step 4: Compute the approximation of the operators G = [A B]
+                A_tilde = U_hat'*X2*V_tilde/(S_tilde)*U1_tilde'*U_hat;
+                B_tilde = U_hat'*X2*V_tilde/(S_tilde)*U2_tilde';
+    %             if (sum(abs(eig(A_tilde)) > 1) ~= 0) % If some eigenvalues are unstable due to machine tolerance
+    %                  disp('Unstable eigenvalues')
+    %             end
 
-            y_hat = Y_hat(end-m+1:end, :); % Extract only non-delay time series (last m rows)
+                % If some eigenvalues are unstable due to machine tolerance,
+                % Scale them to be stable
+                count = 0;
+                while (sum(abs(eig(A_tilde)) > 1) ~= 0) 
+                    count = count+1;
+                    [Ve,De] = eig(A_tilde);
+                    unstable = abs(De)>1; % indexes of unstable eigenvalues
+                    De(unstable) = De(unstable)./abs(De(unstable)) - 10^(-16+count); % Normalize all unstable eigenvalues (set abs(eig) = 1)
+                    A_tilde = Ve*De/(Ve); % New A with margininally stable eigenvalues
+                    A_old = A_tilde;
+                    A_tilde = real(A_tilde);
+                    if(count>10)
+                        break;
+                    end
+                end
 
-            % Vector of Mean Absolute Error on testing data
-            MAE = sum(abs(y_hat - y_test), 2)./N_test; % For each measured state
+                if (sum(abs(eig(A_tilde)) > 1) ~= 0) % If tilde eigenvalues are still unstable
+                    % Record in search space so don't search again
+                    search_space(N_train_i, q_i, p_i) = NaN; 
+                    N_train_record(N_train_i) = N_train; % record q in search
+                    q_record(q_i) = q; % record q in search
+                    p_record(p_i) = p; % record q in search
+                    break; % Exit this p loop if still unstable
+                end
 
-            % MAE metrics scaled according to range of state and average
-            % taken over all states
-            scaled_MAE = mean(MAE./(max(y_test,[],2) - min(y_test,[],2)));
-            scaled_MAE_best = mean(MAE_best./(max(y_test,[],2) - min(y_test,[],2)));
-            
-            % If found best result yet, save it
-            % ???????? compare with other metric.
-            % MAE x outweighs MAE theta.
-            % Use metric compensated for size.
-            if scaled_MAE < scaled_MAE_best
-%                 disp('Found better params:')
-                
-                MAE_best = MAE;
-                p_best = p;
-                q_best = q;
-                time_best = time;
-                
-                if isempty(N_train_saved) % If no saved data file existed
-                    N_train_saved = [N_train];
-                    MAE_saved = [MAE_best];
-                    p_saved = [p_best];
-                    q_saved = [q_best];
-                    time_saved = [time_best];
-                    
-                    save_index = 1; % save_index now has a positive value
-                    
-                elseif save_index == -1 % If first data for N_train
-                    % Insert data in correct place
-                    if N_train < N_train_saved(end)
-                        for save_index = 1:length(N_train_saved)
-                            % Find first index where N_train is bigger
-                            if N_train < N_train_saved(save_index)
-                                % Insert at current saved_index
-                                N_train_saved = insert(N_train_saved, save_index, N_train);
-                                MAE_saved = insert(MAE_saved, save_index, MAE_best);
-                                p_saved = insert(p_saved, save_index, p_best);
-                                q_saved = insert(q_saved, save_index, q_best);
-                                time_saved = insert(time_saved, save_index, time_best);            
-                                break; 
+                % x_tilde(k+1) = A_tilde*x_tilde(k) + B_tilde*u(k)
+                % x = U_hat*x_tilde, Transform to original coordinates
+                % x_tilde = U_hat'*x, Transform to reduced order coordinates
+                % Here x is augmented state
+
+                A = U_hat*A_tilde*U_hat';
+                B = U_hat*B_tilde;
+
+                if (sum(abs(eig(A)) > 1) ~= 0) % If eigenvalues are unstable
+                    % Record in search space so don't search again
+                    search_space(N_train_i, q_i, p_i) = NaN; 
+                    N_train_record(N_train_i) = N_train; % record q in search
+                    q_record(q_i) = q; % record q in search
+                    p_record(p_i) = p; % record q in search
+                    break; % Exit this p loop if still unstable
+                end
+
+                % Time taken to train this model
+                time = time_q + toc(timer_p); % Add time taken in q loop before p chosen
+
+                % x_augmented(k+1) = A*x_aug(k) + B*u(k)
+
+                %% Compare to testing data
+                % Initial condition
+                y_hat_0 = zeros(q*m,1);
+                for row = 0:q-1 % First column of spaced Hankel matrix
+                    y_hat_0(row*m+1:(row+1)*m, 1) = y_train(:, end - ((q-1)*d+1) + row*d + 1);
+                end
+
+                % Run model
+                Y_hat = zeros(length(y_hat_0),N_test); % Empty estimated Y
+                Y_hat(:,1) = y_hat_0; % Initial condition
+                for k = 1:N_test-1
+                    Y_hat(:,k+1) = A*Y_hat(:,k) + B*u_test(:,k);
+                end
+
+                y_hat = Y_hat(end-m+1:end, :); % Extract only non-delay time series (last m rows)
+
+                % Vector of Mean Absolute Error on testing data
+                MAE = sum(abs(y_hat - y_test), 2)./N_test; % For each measured state
+
+                % MAE metrics scaled according to range of state and average
+                % taken over all states
+                scaled_MAE = mean(MAE./(max(y_test,[],2) - min(y_test,[],2)));
+                scaled_MAE_best = mean(MAE_best./(max(y_test,[],2) - min(y_test,[],2)));
+
+                % If found best result yet, save it
+                % ???????? compare with other metric.
+                % MAE x outweighs MAE theta.
+                % Use metric compensated for size.
+                if scaled_MAE < scaled_MAE_best
+    %                 disp('Found better params:')
+
+                    MAE_best = MAE;
+                    p_best = p;
+                    q_best = q;
+                    time_best = time;
+
+                    if isempty(N_train_saved) % If no saved data file existed
+                        N_train_saved = [N_train];
+                        MAE_saved = [MAE_best];
+                        p_saved = [p_best];
+                        q_saved = [q_best];
+                        time_saved = [time_best];
+
+                        save_index = 1; % save_index now has a positive value
+
+                    elseif save_index == -1 % If first data for N_train
+                        % Insert data in correct place
+                        if N_train < N_train_saved(end)
+                            for save_index = 1:length(N_train_saved)
+                                % Find first index where N_train is bigger
+                                if N_train < N_train_saved(save_index)
+                                    % Insert at current saved_index
+                                    N_train_saved = insert(N_train_saved, save_index, N_train);
+                                    MAE_saved = insert(MAE_saved, save_index, MAE_best);
+                                    p_saved = insert(p_saved, save_index, p_best);
+                                    q_saved = insert(q_saved, save_index, q_best);
+                                    time_saved = insert(time_saved, save_index, time_best);            
+                                    break; 
+                                end
                             end
+
+                        else % If N_train is the biggest yet, add to end of list
+                            N_train_saved = [N_train_saved, N_train];
+                            MAE_saved = [MAE_saved, MAE_best];
+                            p_saved = [p_saved, p_best];
+                            q_saved = [q_saved, q_best];
+                            time_saved = [time_saved, time_best];
+
+                            save_index = length(N_train_saved); % save_index now has a positive value
                         end
-                        
-                    else % If N_train is the biggest yet, add to end of list
-                        N_train_saved = [N_train_saved, N_train];
-                        MAE_saved = [MAE_saved, MAE_best];
-                        p_saved = [p_saved, p_best];
-                        q_saved = [q_saved, q_best];
-                        time_saved = [time_saved, time_best];
-                        
-                        save_index = length(N_train_saved); % save_index now has a positive value
+
+
+                    else % Replace previous saved data for N_train
+
+                        MAE_saved(:,save_index) = MAE_best;
+                        p_saved(save_index) = p_best;
+                        q_saved(save_index) = q_best;
+                        time_saved(save_index) = time_best;
+
                     end
 
-                    
-                else % Replace previous saved data for N_train
-                
-                    MAE_saved(:,save_index) = MAE_best;
-                    p_saved(save_index) = p_best;
-                    q_saved(save_index) = q_best;
-                    time_saved(save_index) = time_best;
-                    
+                    % Save results
+                    save(save_file, 'N_train_saved', 'MAE_saved', 'p_saved', 'q_saved', 'time_saved');
                 end
                 
-                % Save results
-                save(save_file, 'N_train_saved', 'MAE_saved', 'p_saved', 'q_saved', 'time_saved');
-            end
+                %% Record in search space 
+                % (Also happens when break from unstable eigenvalues)
+                search_space(N_train_i, q_i, p_i) = scaled_MAE;
+                N_train_record(N_train_i) = N_train; % record q in search
+                q_record(q_i) = q; % record q in search
+                p_record(p_i) = p; % record q in search
 
-        end % end of p loop
+            else
+                % Do nothing, param combo searced before
+                disp('search before')
+            end  % if(new_search)
+            
+        end % p loop
     
-    end % end of q loop
+    end % q loop
    
     disp('Results:')
     MAE_best
@@ -328,6 +391,8 @@ for index = 1:length(N_train_list) % Loop through N_train_list
     
 end
 
+%% Save search_space (not at every loop, only when script ran through)
+save(search_space_file, 'search_space', 'N_train_record', 'q_record', 'p_record')
 
 %% Plot saved results
 disp('Plotting...')

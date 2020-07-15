@@ -1,5 +1,5 @@
 disp('-------------------------')
-%% Load records
+%% Load search space records
 try
     load(search_space_file);
 catch
@@ -16,13 +16,15 @@ end
 % 
 % search_space = zeros(length(N_train_record), length(q_record), length(p_record))
 
-%% Search lists
-N_train_list = 200:100:400;
-q_search = [1];
-p_search = [6,5,8];
+% %% Search lists
+% N_train_list = 100:10:5000;
+% q_search = 4:60;
+% p_search = 8:60;
 
 %% for N_train
-for N_train = N_train_list
+for index = 1:length(N_train_list)
+    N_train = N_train_list(index); % Part of error sweep code
+    
     N_train_i = find(N_train_record == N_train); % index of N_train in search_space
     if isempty(N_train_i) % If N_train not in record list
         N_train_i = length(N_train_record)+1; % q index becomes next in list
@@ -58,7 +60,7 @@ for N_train = N_train_list
                 %% Do p calculations...
                 
                 %% Record search
-                search_space(N_train_i, q_i, p_i) = MAE;
+                search_space(N_train_i, q_i, p_i) = scaled_MAE;
                 N_train_record(N_train_i) = N_train; % record q in search
                 q_record(q_i) = q; % record q in search
                 p_record(p_i) = p; % record q in search
@@ -69,11 +71,7 @@ for N_train = N_train_list
     end % q
 end % N_train
 
-%% Save search_space
-search_space
-N_train_record
-q_record
-p_record
+%% Save search_space (not at every loop, only when script ran through)
 save(search_space_file, 'search_space', 'N_train_record', 'q_record', 'p_record')
 
 
