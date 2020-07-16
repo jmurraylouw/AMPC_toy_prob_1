@@ -36,24 +36,26 @@ N  = length(t);     % Number of data samples
 %% Parameters
 % Very dependant on choice of p, r, q
 
-sigma = 0.01; % Noise standard deviation
+sigma = 0.1; % Noise standard deviation
 c = 1; % Column spacing of Hankel matrix (for multiscale dynamics)
 d = 1; % Row spacing of Hankel matrix (for multiscale dynamics)
+save_counter = 0; % Save time by saving records only once every few iterations
 % N_train; % Num of data samples for training, rest for testing
 % w; % (named 'p' in Multiscale paper) number of columns in Hankel matrix
 % p = Truncated rank of system of Omega
 % r = Truncated rank of system of X2
 % q = number of delays
-N_train_min = 2500; % Minimum length of training data
-N_train_max = 2500; % Maximum length of training data
+
+N_train_min = 800; % Minimum length of training data
+N_train_max = 5000; % Maximum length of training data
 N_train_increment = 100; % (Minimum incr = 100) Increment value of N_train in Grid search
 
-q_min = 10; % Min value of q in Random search
-q_max = 100; % Max value of q in Random search
+q_min = 20; % Min value of q in Random search
+q_max = 130; % Max value of q in Random search
 q_increment = 1; % Increment value of q in Grid search
 
-p_min = 10; % Min value of p in Random search
-p_max = 50; % Max value of p in Random search
+p_min = 60; % Min value of p in Random search
+p_max = 120; % Max value of p in Random search
 p_increment = 1; % Increment value of p in Grid search
 
 N_train_list = N_train_min:N_train_increment:N_train_max; % List of N_train_values to search now
@@ -70,27 +72,29 @@ model_name = 'HAVOK'; % Name of prediction model
 sig_str = strrep(num2str(sigma),'.','_'); % Convert sigma value to string
 save_file = ['Data\', model_name, '_N_train_vs_error', '_sig=', sig_str, '.mat'];
 
-try
-    load(save_file);
-catch
-    disp('No saved results to compare to')  
-    N_train_saved = [];
-    time_saved = 0.01;
-end
+load(save_file);
+% try
+%     load(save_file);
+% catch
+%     disp('No saved results to compare to')  
+%     N_train_saved = [];
+%     time_saved = 0.01;
+% end
 
 %% Load search space records
 search_space_file = ['Data\', model_name, '_search_space_sig=', sig_str, '.mat'];
 
-try
-    load(search_space_file);
-catch
-    disp('No search space file')
-    N_train_record = [];
-    q_record = [];
-    p_record = [];    
-    search_space = zeros(0, 0, 0);
-    sec_per_iteration = [0.01];
-end
+load(search_space_file);
+% try
+%     
+% catch
+%     disp('No search space file')
+%     N_train_record = [];
+%     q_record = [];
+%     p_record = [];    
+%     search_space = zeros(0, 0, 0);
+%     sec_per_iteration = [0.01];
+% end
 
 
 %% Execution time predicted
@@ -101,6 +105,7 @@ predicted_hours = mean(sec_per_iteration)*num_iterations/3600
 for index = 1:length(N_train_list) % Loop through N_train_list
     % index is used to relate all the lists to N_train_list
     disp('--------------------------')
+    N_train_timer = tic;
     N_train = N_train_list(index)
     N_train_is_new = 1; % 1 = first time using this N_train this session
     disp('searching...')
@@ -147,10 +152,9 @@ for index = 1:length(N_train_list) % Loop through N_train_list
             catch % Catch index out of bounds
                 new_search = 1; % 1 = first time searching this param combo
             end
-            
+
             % Only if param combo never been searched before
             if new_search
-                disp('new')
                 %% Code only executed once per N_train
                 if N_train_is_new 
                     % Training data - Last sample of training is first sample of testing
@@ -375,7 +379,15 @@ for index = 1:length(N_train_list) % Loop through N_train_list
                 N_train_record(N_train_i) = N_train; % record q in search
                 q_record(q_i) = q; % record q in search
                 p_record(p_i) = p; % record q in search
-
+                
+                % Save every few iterations to keep progress, yet save time
+                save(search_space_file, 'search_space', 'N_train_record', 'q_record', 'p_record', 'sec_per_iteration')
+%                 if save_counter > 100
+%                     disp('save')
+%                     save(search_space_file, 'search_space', 'N_train_record', 'q_record', 'p_record', 'sec_per_iteration')
+%                     save_counter = 0;
+%                 end
+%                 save_counter = save_counter+1; 
             else
                 % Do nothing, param combo searced before
 %                 disp('Params were searched before')
@@ -390,15 +402,16 @@ for index = 1:length(N_train_list) % Loop through N_train_list
 %     p_best
 %     q_best
 %     time
+    N_train_time = toc(N_train_timer);
+    disp(['Spent ', num2str(N_train_time), ' seconds searching this N_train'])
     disp('--------------------------')
-    
+
 end
 
 %% Save search_space (not at every loop, only when script ran through)
 total_time = toc(total_timer);
 sec_per_iteration = [sec_per_iteration; total_time/num_iterations];
 save(search_space_file, 'search_space', 'N_train_record', 'q_record', 'p_record', 'sec_per_iteration')
-
 %% Plot saved results
 disp('Plotting...')
 close all;
@@ -418,14 +431,6 @@ subplot(1,2,2), bar(q_table(:,1), q_table(:,2)), title('Frequency of q');
 toc(total_timer);
 disp('--------------------------')
 disp('END of HAVOK N_train sweep')
-
-%%
-figure
-plot(p_record','.')
-figure
-plot(q_record','.')
-N_train_i
-
 
 %% Local functions
 function X_hat = plot_model(A,B,U_data,t,x0)

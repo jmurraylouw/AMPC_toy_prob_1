@@ -38,8 +38,8 @@ N  = length(t);     % Number of data samples
 %% Parameters
 % Very dependant on choice of p, r, q
 
-sigma = 0.01; % Noise standard deviation
-N_train = 2500; % Number of sampels in training data
+sigma = 0.1; % Noise standard deviation
+N_train = 700; % Number of sampels in training data
 c = 1; % Column spacing of Hankel matrix (for multiscale dynamics)
 d = 1; % Row spacing of Hankel matrix (for multiscale dynamics)
 % w; % (named 'p' in Multiscale paper) number of columns in Hankel matrix
@@ -67,11 +67,11 @@ try
         q = q_saved(save_index)
         time = time_saved(save_index)
         
-        % Override
-        disp('Override')
-        disp('------------------')
-        q = 32
-        p = 18
+%         % Override
+%         disp('Override')
+%         disp('------------------')
+% 
+%         p = 15
 
     else
         N_train
@@ -230,8 +230,10 @@ disp('Run model on training data')
 
 %% Plot data vs model
 figure;
-plot(t, y_data); 
+plot(t_train, y_train);
 hold on;
+plot(t_test, y_test);
+
 plot(t, u_data, ':', 'LineWidth', 1);
 plot(t_test, y_hat, '--', 'LineWidth', 1); % Plot only non-delay coordinate
 plot(t_train, y_hat2, '--', 'LineWidth', 1); % Plot only non-delay coordinate  
