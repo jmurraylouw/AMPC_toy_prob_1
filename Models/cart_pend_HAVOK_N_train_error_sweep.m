@@ -60,6 +60,7 @@ p_increment = 1; % Increment value of p in Grid search
 
 N_train_list = N_train_min:N_train_increment:N_train_max; % List of N_train_values to search now
 q_search = q_min:q_increment:q_max; % List of q parameters to search in
+q_search = 20:50;
 % p_search defined before p for loop
 
 % Add noise once
@@ -381,13 +382,13 @@ for index = 1:length(N_train_list) % Loop through N_train_list
                 p_record(p_i) = p; % record q in search
                 
                 % Save every few iterations to keep progress, yet save time
-                save(search_space_file, 'search_space', 'N_train_record', 'q_record', 'p_record', 'sec_per_iteration')
-%                 if save_counter > 100
-%                     disp('save')
-%                     save(search_space_file, 'search_space', 'N_train_record', 'q_record', 'p_record', 'sec_per_iteration')
-%                     save_counter = 0;
-%                 end
-%                 save_counter = save_counter+1; 
+%                 save(search_space_file, 'search_space', 'N_train_record', 'q_record', 'p_record', 'sec_per_iteration')
+                if save_counter > 500
+                    disp('save')
+                    save(search_space_file, 'search_space', 'N_train_record', 'q_record', 'p_record', 'sec_per_iteration')
+                    save_counter = 0;
+                end
+                save_counter = save_counter+1; 
             else
                 % Do nothing, param combo searced before
 %                 disp('Params were searched before')
