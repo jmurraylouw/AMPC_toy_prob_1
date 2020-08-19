@@ -1,4 +1,4 @@
-function dx = cartpend(t,x,u,M,m,L,g)
+    function [dx, y] = cartpend(t,x,u,M,m,L,d,g,varargin)
     %CARTPEND Models a continuous system of a pendulem on a cart.
     %   based on Steve Brunton code. See youtube.com/watch?v=qjhAAQexzLg&list=PLMrJAkhIeNNR20Mz-VpzgfQs5zrYi085m&index=12
     %   x  = state vector [x; x_dot; theta; theta_dot]
@@ -11,22 +11,22 @@ function dx = cartpend(t,x,u,M,m,L,g)
     %   d  = damping coef of friction on cart
     %,m,M,L,g,d,u
 
-%     m = 1;
-%     M = 3;
-%     L = 2;
-%     g = -9.81;
-    d = 0;
-
+    % Output measurements
+    y = zeros(2,1);
+    y(1,1) = x(1);
+    y(2,1) = x(3);
+    
+    % Derivatives
     dx = zeros(4,1);
 
     Sx = sin(x(3));
     Cx = cos(x(3));
-    D = ( m*L*L*M + m*m*L*L*(1 - Cx^2) );
     
+    % Equations from derive_cartpend.m
     dx(1,1) = x(2);
-    dx(2,1) = (1/D)*(-m^2*L^2*g*Cx*Sx + m*L^2*m*L*Sx*x(4)^2 - m*L^2*d*x(2) + m*L*L*u);
+    dx(2,1) = (L*m*sin(x(3))*x(4)^2 + u - d*x(2) + g*m*cos(x(3))*sin(x(3)))/(- m*cos(x(3))^2 + M + m);
     dx(3,1) = x(4);
-    dx(4,1) = (1/D)*((m+M)*m*g*L*Sx - m*L*Cx*m*L*x(4)^2*Sx - m*L*Cx*d*x(2) - m*L*Cx*u); % +.01*randn;
+    dx(4,1) = -(L*m*cos(x(3))*sin(x(3))*x(4)^2 + u*cos(x(3)) - d*x(2)*cos(x(3)) + g*m*sin(x(3)) + M*g*sin(x(3)))/(L*(- m*cos(x(3))^2 + M + m));
 end
 
 
