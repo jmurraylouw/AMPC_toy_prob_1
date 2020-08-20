@@ -1,14 +1,23 @@
 %% HAVOK N_train vs error sweep with grid search for parameters
 % HAVOK with control - of cart pendulum
-% Sweep through different N_train, find best parameters and calculate error
+% Sweep through different N_train, 
+% do grid search to find best hyper-parameters for each N_train with sigma
+% save best error with corresponding hyper-parameters for each N_train
+% save hyper-parameters already searched for each N_train and sigma
+%   combination to avoid searching same search space again
+% 
+% Use corresponding HAVOK_script to load and run best hyperparameters to 
+% see prediction results 
 
-clear all;
+% clear all;
 close all;
 total_timer = tic;
 
 %% Read data
 
-load('floating_pend_2D_random_1.mat') % Load simulation data
+% load('floating_pend_2D_random_1.mat') % Load simulation data
+% load('floating_pend_2D_PI_z_control_and_random_1.mat') % simulation data with z controlled by PI controller
+
 u_data  = out.u.Data';
 x_data  = out.x.Data';
 y_data  = x_data([1:3],:); % Measurement data (x, z, theta)
@@ -31,6 +40,9 @@ N  = length(t);     % Number of data samples
 % Very dependant on choice of p, r, q
 
 sigma = 0.001; % Noise standard deviation
+
+state_scale = [1; 1; 2]; % Scale MAE of each state by this when comparing models
+
 c = 1; % Column spacing of Hankel matrix (for multiscale dynamics)
 d = 1; % Row spacing of Hankel matrix (for multiscale dynamics)
 
@@ -46,19 +58,18 @@ save_counter = 0; % Counter to reset after saving
 
 N_train_min = 3000; % Minimum length of training data
 N_train_max = 3000; % Maximum length of training data
-N_train_increment = 100; % (Minimum incr = 100) Increment value of N_train in Grid search
+N_train_increment = 500; % (Minimum incr = 100) Increment value of N_train in Grid search
 
-q_min = 20; % Min value of q in Random search
-q_max = 60; % Max value of q in Random search
+q_min = 4; % Min value of q in Random search
+q_max = 100; % Max value of q in Random search
 q_increment = 1; % Increment value of q in Grid search
 
-p_min = 60; % Min value of p in Random search
-p_max = 120; % Max value of p in Random search
+p_min = 4; % Min value of p in Random search
+p_max = 100; % Max value of p in Random search
 p_increment = 1; % Increment value of p in Grid search
 
 N_train_list = N_train_min:N_train_increment:N_train_max; % List of N_train_values to search now
 q_search = q_min:q_increment:q_max; % List of q parameters to search in
-q_search = 20:50;
 % p_search defined before p for loop
 
 % Add noise once
@@ -313,8 +324,8 @@ for index = 1:length(N_train_list) % Loop through N_train_list
 
                 % MAE metrics scaled according to range of state and average
                 % taken over all states
-                scaled_MAE = mean(MAE./(max(y_test,[],2) - min(y_test,[],2)));
-                scaled_MAE_best = mean(MAE_best./(max(y_test,[],2) - min(y_test,[],2)));
+                scaled_MAE = mean(MAE.*state_scale);
+                scaled_MAE_best = mean(MAE_best.*state_scale);
 
                 % If found best result yet, save it
                 if scaled_MAE < scaled_MAE_best
@@ -419,14 +430,14 @@ disp('Plotting...')
 close all;
 
 for fig_num = 1:m % Plot error of every measured state
-    figure(fig_num), semilogy(N_train_saved,MAE_saved(fig_num,:)), title(['MAE of x(', num2str(fig_num), ') vs N-train'])
+    figure(fig_num), semilogy(N_train_saved,MAE_saved(fig_num,:),'x'), title(['MAE of x(', num2str(fig_num), ') vs N-train'])
 end
-
-figure(fig_num), plot(N_train_saved,p_saved), title('p vs N-train')
 fig_num = fig_num + 1; % Increment fig_num for next figure
-figure(fig_num), plot(N_train_saved,q_saved), title('q vs N-train')
+figure(fig_num), plot(N_train_saved,p_saved,'x'), title('p vs N-train')
+fig_num = fig_num + 1; 
+figure(fig_num), plot(N_train_saved,q_saved,'x'), title('q vs N-train')
 fig_num = fig_num + 1;
-figure(fig_num), plot(N_train_saved,time_saved), title('time vs N-train')
+figure(fig_num), plot(N_train_saved,time_saved,'x'), title('time vs N-train')
 fig_num = fig_num + 1;
 
 figure(fig_num)

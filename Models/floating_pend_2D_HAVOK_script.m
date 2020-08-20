@@ -7,14 +7,16 @@
 %% Read data
 
 close all;
-clear all;
 
 total_timer = tic;
 
-load('floating_pend_2D_random_1.mat') % Load simulation data
+% load('floating_pend_2D_random_1.mat') % Load simulation data
+% load('floating_pend_2D_PI_z_control_and_random_1.mat') % simulation data with z controlled by PI controller
+
 u_data  = out.u.Data';
 x_data  = out.x.Data';
-y_data  = x_data([1,3],:); % Measurement data (x and theta)
+% NB! set which variables are measured
+y_data  = x_data([1:3],:); % Measurement data (x,z, theta)
 t       = out.tout'; % Time
 
 % Testing data - Last 50 s is for testing and one sample overlaps training 
@@ -33,7 +35,7 @@ N  = length(t);     % Number of data samples
 %% Parameters
 % Very dependant on choice of p, r, q
 
-sigma = 0.01; % Noise standard deviation
+sigma = 0.001; % Noise standard deviation
 N_train = 3000; % Number of sampels in training data
 c = 1; % Column spacing of Hankel matrix (for multiscale dynamics)
 d = 1; % Row spacing of Hankel matrix (for multiscale dynamics)
@@ -81,15 +83,16 @@ try
 catch
     error(['Saved results file:', newline, save_file, newline, 'does not exist'])  
 end
-        
-r = p-l; % Reduced rank of X2 svd, r < p, (minus number of inputs from rank)
+
+% r = p - 2;
+r = p - l; % Reduced rank of X2 svd, r < p, (minus number of inputs from rank)
 w = N_train - q; % num columns of Hankel matrix
 D = (q-1)*d*Ts; % Delay duration (Dynamics in delay embedding)
 
 % Training data - Last sample of training is first sample of testing
-y_train = y_data_noise(:,end-N_test-N_train+2:end-N_test+1); % Use noisy data
-u_train = u_data(:,end-N_test-N_train+2:end-N_test+1);
-t_train = t(:,end-N_test-N_train+2:end-N_test+1);
+y_train = y_data_noise(:, end-N_test-N_train+2:end-N_test+1); % Use noisy data
+u_train = u_data(:, end-N_test-N_train+2:end-N_test+1);
+t_train = t(:, end-N_test-N_train+2:end-N_test+1);
 
 timer_model = tic; % Start timer for this model evaluation
 
@@ -205,7 +208,7 @@ MAE = sum(abs(y_hat - y_test), 2)./N_test % For each measured state
 
 
 %% Compare to training data
-disp(6)
+disp('Compare to training data')
 % Initial conditions
 y_hat_02 = zeros(q*m,1);
 for row = 0:q-1 % Create first column of spaced Hankel matrix
@@ -228,7 +231,7 @@ plot(t_train, y_train);
 hold on;
 plot(t_test, y_test);
 
-plot(t, u_data, ':', 'LineWidth', 1);
+% plot(t, u_data, ':', 'LineWidth', 1);
 plot(t_test, y_hat, '--', 'LineWidth', 1); % Plot only non-delay coordinate
 plot(t_train, y_hat2, '--', 'LineWidth', 1); % Plot only non-delay coordinate  
 plot((D + t(N-N_test-N_train)).*[1,1], ylim, 'r');
