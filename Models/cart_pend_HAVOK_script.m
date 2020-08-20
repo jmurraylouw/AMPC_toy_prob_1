@@ -55,6 +55,7 @@ y_data_noise = y_data + sigma*randn(size(y_data));
 %% Load saved results
 model_name = 'HAVOK'; % Name of prediction model
 sig_str = strrep(num2str(sigma),'.','_'); % Convert sigma value to string
+
 save_file = ['Data/', model_name, '_N_train_vs_error', '_sig=', sig_str, '.mat'];
 
 try
