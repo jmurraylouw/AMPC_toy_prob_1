@@ -2,6 +2,10 @@
 % simueltaneous state and parameter estimation
 % on data from cart_pend
 
+% Setup
+rng(0);
+random_generator = rng; % repeatable random numbers
+
 % System definition
 f = @cartpend; % Function handle
 g = @measure; % Measurement function handle
@@ -23,29 +27,31 @@ u_test = u_data(:,end-N_test+1:end);
 t_test = t(:,end-N_test+1:end);
 
 % Training data - Last sample of training is first sample of testing
-N_train = 1000; % Num of data samples for training, rest for testing
+N_train = 2000; % Num of data samples for training, rest for testing
 y_train = y_data(:,end-N_test-N_train+2:end-N_test+1);
 u_train = u_data(:,end-N_test-N_train+2:end-N_test+1);
 t_train = t(:,end-N_test-N_train+2:end-N_test+1);
 
 % Add noise
-sigma = 0.0;
+sigma = 0.01;
 y_train = y_train + sigma*randn(size(y_train));
 
-% Parameters
-P0 = 0.1*eye(nx); % Initial guess uncertainty
-Q = diag([0; 0.00001; 0; 0.00001; 0.00001; 0.00001; 0.00001; 0.00001]); % Model uncertainty
-R = sigma*eye(ny); % Measurement uncertainty
-
-% Initialise
+% Initial conditions
 % x = [x, x_dot, theta, theta_dot, L, m, d]
 x0 = [0; 0; 0; 0; 2; 4; 1; 5]; % Correct initial values
-x0 = x0 + P0(1,1)*randn(size(x0)); % Add random value to initial guesses
 nx = length(x0); % 4 states, 3 paramters
 ny = length(g(x0)); % x and theta
 u0 = 0;
 nu = length(u0);
 
+% Parameters
+P0 = 0.1*eye(nx); % Initial guess uncertainty
+std_fraction = 0.1; % Standard deviation as a fraction of variable
+x0 = abs(x0 + (std_fraction*x0).*randn(size(x0))); % Add random value to initial guesses
+Q = diag([0; 0.00001; 0; 0.00001; 0.00001; 0.00001; 0.00001; 0.00001]); % Model uncertainty
+R = sigma*eye(ny); % Measurement uncertainty
+
+% Set start variables to intitial conditions
 x_hat = x0;
 P = P0;
 u = u0;
@@ -137,6 +143,11 @@ y_test = x_test([1,3],:);
 % Vector of Mean Absolute Error on testing data
 MAE = sum(abs(y_hat - y_test), 2)./N_test % For each measured state
 
+% Display N_train and sigma
+N_train
+sigma
+
+%% Plot results
 state_rows = [1,3];
 figure
 plot(t, y_data); hold on
@@ -145,7 +156,7 @@ plot(t_test, y_hat, '--');
 plot([t(N-N_test-N_train) t(N-N_test-N_train)], ylim, 'r');
 plot([t(N-N_test) t(N-N_test)], ylim, 'k');
 hold off;
-title('State estimation');
+title('EKF estimated model prediction');
 
 
 
@@ -156,7 +167,7 @@ function dx = cartpend(x,u)
 %     x_dot;
 %     theta;
 %     theta_dot;
-%     L;]
+%     parameters;]
 
 % Parameters
 m = x(5);% 2;
@@ -173,7 +184,7 @@ nx = length(x);
 
 dx = zeros(nx,1); % Assign memory space
 dx(1,1) = x(2);
-dx(2,1) = (1/D)*(-m^2*L^2*g*Cx*Sx + m*L^2*(m*L*x(4)^2*Sx - d*x(2))) + m*L*L*(1/D)*u;
+dx(2,1) = (1/D)*(-m^2*L^2*g*Cx*Sx + m*L^2*m*L*x(4)^2*Sx - m*L^2*d*x(2) + m*L*L*u);
 dx(3,1) = x(4);
 dx(4,1) = (1/D)*((m+M)*m*g*L*Sx - m*L*Cx*(m*L*x(4)^2*Sx - d*x(2))) - m*L*Cx*(1/D)*u; % +.01*randn;
 end

@@ -39,7 +39,7 @@ N  = length(t);     % Number of data samples
 % Very dependant on choice of p, r, q
 
 sigma = 0.1; % Noise standard deviation
-N_train = 700; % Number of sampels in training data
+N_train = 2000; % Number of sampels in training data
 c = 1; % Column spacing of Hankel matrix (for multiscale dynamics)
 d = 1; % Row spacing of Hankel matrix (for multiscale dynamics)
 % w; % (named 'p' in Multiscale paper) number of columns in Hankel matrix
@@ -55,7 +55,7 @@ y_data_noise = y_data + sigma*randn(size(y_data));
 %% Load saved results
 model_name = 'HAVOK'; % Name of prediction model
 sig_str = strrep(num2str(sigma),'.','_'); % Convert sigma value to string
-save_file = ['Data\', model_name, '_N_train_vs_error', '_sig=', sig_str, '.mat'];
+save_file = ['Data/', model_name, '_N_train_vs_error', '_sig=', sig_str, '.mat'];
 
 try
     load(save_file);
@@ -89,8 +89,6 @@ end
 r = p-l; % Reduced rank of X2 svd, r < p, (minus number of inputs from rank)
 w = N_train - q; % num columns of Hankel matrix
 D = (q-1)*d*Ts; % Delay duration (Dynamics in delay embedding)
-
-%% Loop through different training lengths
 
 % Training data - Last sample of training is first sample of testing
 y_train = y_data_noise(:,end-N_test-N_train+2:end-N_test+1); % Use noisy data

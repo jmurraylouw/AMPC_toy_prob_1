@@ -21,7 +21,7 @@ N = size(X,1); % Number of data samples per state
 n = size(X,2); % Number of states
 
 % Parameters
-N_train = 3000; % Num of data samples for training, rest for testing
+N_train = 2000; % Num of data samples for training, rest for testing
 sigma = 0.00000; % Standard deviation of noise
 
 % Train/Test split
@@ -273,8 +273,11 @@ end
 y_hat = x_hat(:,[1,3]);
 y_test = X_test(:,[1,3]);
 
-% Vector of Root Mean Squared Error on testing data
-RMSE = sqrt(sum((y_hat' - y_test').^2, 2)./N_test) % Each row represents RMSE for measured state
+% Vector of Mean Absolute Error on testing data
+MAE = sum(abs(y_hat' - y_test'), 2)./N_test % For each measured state
+
+% % Vector of Root Mean Squared Error on testing data
+% RMSE = sqrt(sum((y_hat' - y_test').^2, 2)./N_test) % Each row represents RMSE for measured state
 
 
 %% Plot simulation data vs model data
