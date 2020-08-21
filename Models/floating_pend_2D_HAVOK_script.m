@@ -7,11 +7,9 @@
 %% Read data
 
 close all;
-
 total_timer = tic;
 
-% load('floating_pend_2D_random_1.mat') % Load simulation data
-% load('floating_pend_2D_PI_z_control_and_random_1.mat') % simulation data with z controlled by PI controller
+% load('floating_pend_2D_data_1.mat') % Load simulation data
 
 u_data  = out.u.Data';
 x_data  = out.x.Data';
@@ -64,12 +62,13 @@ try
         p = p_saved(save_index)
         q = q_saved(save_index)
         time = time_saved(save_index)
-        
+       
 %         % Override
 %         disp('Override')
 %         disp('------------------')
 % 
-%         p = 15
+%         q = 60
+%         p = 27
 
     else
         N_train

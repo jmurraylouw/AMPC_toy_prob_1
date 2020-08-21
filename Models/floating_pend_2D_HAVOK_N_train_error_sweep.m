@@ -41,7 +41,7 @@ N  = length(t);     % Number of data samples
 
 sigma = 0.001; % Noise standard deviation
 
-state_scale = [1; 1; 2]; % Scale MAE of each state by this when comparing models
+state_scale = [1; 1; 1]; % Scale MAE of each state by this when comparing models
 
 c = 1; % Column spacing of Hankel matrix (for multiscale dynamics)
 d = 1; % Row spacing of Hankel matrix (for multiscale dynamics)
@@ -64,8 +64,8 @@ q_min = 4; % Min value of q in Random search
 q_max = 100; % Max value of q in Random search
 q_increment = 1; % Increment value of q in Grid search
 
-p_min = 4; % Min value of p in Random search
-p_max = 100; % Max value of p in Random search
+p_min = 10; % Min value of p in Random search
+p_max = 50; % Max value of p in Random search
 p_increment = 1; % Increment value of p in Grid search
 
 N_train_list = N_train_min:N_train_increment:N_train_max; % List of N_train_values to search now
