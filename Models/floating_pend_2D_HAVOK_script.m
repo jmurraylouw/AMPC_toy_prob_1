@@ -61,7 +61,7 @@ try
         MAE = MAE_saved(:,save_index) 
         p = p_saved(save_index)
         q = q_saved(save_index)
-        time = time_saved(save_index)
+        r = r_saved(save_index)
        
 %         % Override
 %         disp('Override')
@@ -84,7 +84,7 @@ catch
 end
 
 % r = p - 2;
-r = p - l; % Reduced rank of X2 svd, r < p, (minus number of inputs from rank)
+% r = p - l; % Reduced rank of X2 svd, r < p, (minus number of inputs from rank)
 w = N_train - q; % num columns of Hankel matrix
 D = (q-1)*d*Ts; % Delay duration (Dynamics in delay embedding)
 
