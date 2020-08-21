@@ -7,11 +7,11 @@
 %% Read data
 
 close all;
-clear all;
+% clear all;
 
 total_timer = tic;
 
-load('cartpend_random_1.mat') % Load simulation data
+% load('cartpend_random_1.mat') % Load simulation data
 % x0 = [1; -0.2; -0.5; 0.8]
 u_data  = out.u.Data';
 x_data  = out.x.Data';
@@ -38,7 +38,7 @@ N  = length(t);     % Number of data samples
 %% Parameters
 % Very dependant on choice of p, r, q
 
-sigma = 0.1; % Noise standard deviation
+sigma = 0.01; % Noise standard deviation
 N_train = 2000; % Number of sampels in training data
 c = 1; % Column spacing of Hankel matrix (for multiscale dynamics)
 d = 1; % Row spacing of Hankel matrix (for multiscale dynamics)

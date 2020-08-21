@@ -60,16 +60,16 @@ N_train_min = 3000; % Minimum length of training data
 N_train_max = 3000; % Maximum length of training data
 N_train_increment = 500; % (Minimum incr = 100) Increment value of N_train in Grid search
 
-q_min = 4; % Min value of q in Random search
+q_min = 80; % Min value of q in Random search
 q_max = 100; % Max value of q in Random search
 q_increment = 1; % Increment value of q in Grid search
 
-p_min = 10; % Min value of p in Random search
-p_max = 50; % Max value of p in Random search
+p_min = 20; % Min value of p in Random search
+p_max = 40; % Max value of p in Random search
 p_increment = 1; % Increment value of p in Grid search
 
 r_p_diff_min = l; % Min difference between r and p
-r_p_diff_max = 15; % Max difference between r and p 
+r_p_diff_max = 5; % Max difference between r and p 
 r_increment = 1; % Increment value of r in Grid search     
 
 N_train_list = N_train_min:N_train_increment:N_train_max; % List of N_train_values to search now
@@ -114,7 +114,7 @@ end
 
 
 %% Execution time predicted
-num_iterations = length(N_train_list)*length(q_search)*length(p_min:p_increment:p_max)
+num_iterations = length(N_train_list)*length(q_search)*length(p_min:p_increment:p_max)*length(r_p_diff_min:r_increment:r_p_diff_max)
 predicted_hours = mean(sec_per_iteration)*num_iterations/3600
 
 %% Loop through different training lengths

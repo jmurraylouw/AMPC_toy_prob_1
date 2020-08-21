@@ -12,6 +12,8 @@ total_timer = tic;
 % load('floating_pend_2D_data_1.mat') % Load simulation data
 
 u_data  = out.u.Data';
+u_data(2,:)  = u_data(2,:) - 6*9.81; % Add gravity
+
 x_data  = out.x.Data';
 % NB! set which variables are measured
 y_data  = x_data([1:3],:); % Measurement data (x,z, theta)
@@ -63,12 +65,13 @@ try
         q = q_saved(save_index)
         r = r_saved(save_index)
        
-%         % Override
-%         disp('Override')
-%         disp('------------------')
-% 
+        % Override
+        disp('Override')
+        disp('------------------')
+
 %         q = 60
-%         p = 27
+%         p = 32
+%         r = 27
 
     else
         N_train
