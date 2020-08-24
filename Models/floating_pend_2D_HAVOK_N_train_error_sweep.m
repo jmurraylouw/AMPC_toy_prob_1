@@ -92,7 +92,7 @@ y_data_noise = y_data + sigma*randn(size(y_data));
 %% Load saved results
 model_name = 'HAVOK'; % Name of prediction model
 sig_str = strrep(num2str(sigma),'.','_'); % Convert sigma value to string
-save_file = ['Data\', simulation_data_file, '_', model_name, '_error_sweep', '_sig=', sig_str, '.mat'];
+save_file = ['Data/', simulation_data_file, '_', model_name, '_error_sweep', '_sig=', sig_str, '.mat'];
 
 try
     load(save_file);
@@ -105,7 +105,7 @@ catch
 end
 
 %% Load search space records
-search_space_file = ['Data\', simulation_data_file, '_', model_name, '_search_space_sig=', sig_str, '.mat'];
+search_space_file = ['Data/', simulation_data_file, '_', model_name, '_search_space_sig=', sig_str, '.mat'];
 
 try
     load(search_space_file);
