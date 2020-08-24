@@ -17,11 +17,18 @@ total_timer = tic;
 
 % load('floating_pend_2D_random_1.mat') % Load simulation data
 % load('floating_pend_2D_PI_z_control_and_random_1.mat') % simulation data with z controlled by PI controller
+simulation_data_file = 'floating_pend_2D_data_1';
+load(['Data/', simulation_data_file, '.mat']) % Load simulation data
 
+% Extract data
 u_data  = out.u.Data';
 x_data  = out.x.Data';
 y_data  = x_data([1:3],:); % Measurement data (x, z, theta)
 t       = out.tout'; % Time
+
+% Adjust for constant disturbance / mean control values
+u_bar = [0; -6*9.81]; % Mean input needed to keep at a fized point
+u_data  = u_data + u_bar; % Adjust for unmeasured input
 
 % Testing data - Last 50 s is for testing and one sample overlaps training 
 N_test = 5000; % Num of data samples for testing
@@ -56,8 +63,8 @@ d = 1; % Row spacing of Hankel matrix (for multiscale dynamics)
 save_interval = 500; % Save time by saving records only once every few iterations
 save_counter = 0; % Counter to reset after saving
 
-N_train_min = 3000; % Minimum length of training data
-N_train_max = 3000; % Maximum length of training data
+N_train_min = 3100; % Minimum length of training data
+N_train_max = 3100; % Maximum length of training data
 N_train_increment = 500; % (Minimum incr = 100) Increment value of N_train in Grid search
 
 q_min = 80; % Min value of q in Random search
@@ -68,13 +75,14 @@ p_min = 20; % Min value of p in Random search
 p_max = 40; % Max value of p in Random search
 p_increment = 1; % Increment value of p in Grid search
 
-r_p_diff_min = l; % Min difference between r and p
-r_p_diff_max = 5; % Max difference between r and p 
+r_p_diff_min = 4; % Min difference between r and p
+r_p_diff_max = 4; % Max difference between r and p 
 r_increment = 1; % Increment value of r in Grid search     
 
 N_train_list = N_train_min:N_train_increment:N_train_max; % List of N_train_values to search now
 q_search = q_min:q_increment:q_max; % List of q parameters to search in
 % p_search defined before p for loop
+% r_search defined before r for loop
 
 % Add noise once
 rng('default');
@@ -82,11 +90,9 @@ rng(1); % Repeatable random numbers
 y_data_noise = y_data + sigma*randn(size(y_data));
 
 %% Load saved results
-estimation_name = 'HAVOK'; % Name of prediction model
-plant_name = 'floating_pend_2D'; % Name of prediction model
+model_name = 'HAVOK'; % Name of prediction model
 sig_str = strrep(num2str(sigma),'.','_'); % Convert sigma value to string
-save_file = ['Data/', plant_name, '_', estimation_name, '_N_train_vs_error', '_sig=', sig_str, '.mat'];
-% load(save_file);
+save_file = ['Data\', simulation_data_file, '_', model_name, '_error_sweep', '_sig=', sig_str, '.mat'];
 
 try
     load(save_file);
@@ -99,7 +105,7 @@ catch
 end
 
 %% Load search space records
-search_space_file = ['Data/', plant_name, '_', estimation_name, '_search_space_sig=', sig_str, '.mat'];
+search_space_file = ['Data\', simulation_data_file, '_', model_name, '_search_space_sig=', sig_str, '.mat'];
 
 try
     load(search_space_file);

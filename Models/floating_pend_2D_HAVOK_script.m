@@ -9,15 +9,18 @@
 close all;
 total_timer = tic;
 
-% load('floating_pend_2D_data_1.mat') % Load simulation data
+simulation_data_file = 'floating_pend_2D_data_1';
+load(['Data/', simulation_data_file, '.mat']) % Load simulation data
 
+% Extract data
 u_data  = out.u.Data';
-u_data(2,:)  = u_data(2,:) - 6*9.81; % Add gravity
-
 x_data  = out.x.Data';
-% NB! set which variables are measured
-y_data  = x_data([1:3],:); % Measurement data (x,z, theta)
+y_data  = x_data([1:3],:); % Measurement data (x, z, theta)
 t       = out.tout'; % Time
+
+% Adjust for constant disturbance / mean control values
+u_bar = [0; -6*9.81]; % Mean input needed to keep at a fized point
+u_data  = u_data + u_bar; % Adjust for unmeasured input
 
 % Testing data - Last 50 s is for testing and one sample overlaps training 
 N_test = 5000; % Num of data samples for testing
@@ -36,7 +39,7 @@ N  = length(t);     % Number of data samples
 % Very dependant on choice of p, r, q
 
 sigma = 0.001; % Noise standard deviation
-N_train = 3000; % Number of sampels in training data
+N_train = 3100; % Number of sampels in training data
 c = 1; % Column spacing of Hankel matrix (for multiscale dynamics)
 d = 1; % Row spacing of Hankel matrix (for multiscale dynamics)
 % w; % (named 'p' in Multiscale paper) number of columns in Hankel matrix
@@ -50,10 +53,9 @@ rng(1); % Repeatable random numbers
 y_data_noise = y_data + sigma*randn(size(y_data));
 
 %% Load saved results
-estimation_name = 'HAVOK'; % Name of prediction model
-plant_name = 'floating_pend_2D'; % Name of prediction model
+model_name = 'HAVOK'; % Name of prediction model
 sig_str = strrep(num2str(sigma),'.','_'); % Convert sigma value to string
-save_file = ['Data/', plant_name, '_', estimation_name, '_N_train_vs_error', '_sig=', sig_str, '.mat'];
+save_file = ['Data\', simulation_data_file, '_', model_name, '_error_sweep', '_sig=', sig_str, '.mat'];
 
 try
     load(save_file);
@@ -65,9 +67,9 @@ try
         q = q_saved(save_index)
         r = r_saved(save_index)
        
-        % Override
-        disp('Override')
-        disp('------------------')
+%         % Override
+%         disp('Override')
+%         disp('------------------')
 
 %         q = 60
 %         p = 32
@@ -77,7 +79,8 @@ try
         N_train
         error('No saved results for this N_train value')
         
-%         disp('Override')
+        disp('Override')
+        r = 28
 %         q = 4
 %         p = 8
     end

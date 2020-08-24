@@ -12,11 +12,17 @@ close all;
 total_timer = tic;
 
 % load('cartpend_random_1.mat') % Load simulation data
-% x0 = [1; -0.2; -0.5; 0.8]
+load('Data/cartpend_disturbance_and_PID_1.mat') % Load simulation data
+
+% Extract data
 u_data  = out.u.Data';
 x_data  = out.x.Data';
-y_data  = x_data([1,3],:); % Measurement data (x and theta)
+y_data  = x_data([1,3],:); % Measurement data (x, z, theta)
 t       = out.tout'; % Time
+
+% Adjust for constant disturbance / mean control values
+u_bar = [5]; % Mean input needed to keep at a fized point
+u_data  = u_data + u_bar; % Adjust for unmeasured input
 
 % Testing data - Last 50 s is for testing and one sample overlaps training 
 N_test = 5000; % Num of data samples for testing
@@ -39,7 +45,7 @@ N  = length(t);     % Number of data samples
 % Very dependant on choice of p, r, q
 
 sigma = 0.01; % Noise standard deviation
-N_train = 2000; % Number of sampels in training data
+N_train = 4000; % Number of sampels in training data
 c = 1; % Column spacing of Hankel matrix (for multiscale dynamics)
 d = 1; % Row spacing of Hankel matrix (for multiscale dynamics)
 % w; % (named 'p' in Multiscale paper) number of columns in Hankel matrix
@@ -87,7 +93,7 @@ catch
     error('Saved results file does not exist')  
 end
         
-r = p-l; % Reduced rank of X2 svd, r < p, (minus number of inputs from rank)
+r = p-l-4; % Reduced rank of X2 svd, r < p, (minus number of inputs from rank)
 w = N_train - q; % num columns of Hankel matrix
 D = (q-1)*d*Ts; % Delay duration (Dynamics in delay embedding)
 

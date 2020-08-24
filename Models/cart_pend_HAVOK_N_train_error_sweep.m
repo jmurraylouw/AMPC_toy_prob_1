@@ -9,12 +9,19 @@
 clear all;
 close all;
 total_timer = tic;
-load('cartpend_random_1.mat') % Load simulation data
-% x0 = [1; -0.2; -0.5; 0.8]
+% load('cartpend_random_1.mat') % Load simulation data
+simulation_data_file = 'cartpend_disturbance_and_PID_1';
+load(['Data/', simulation_data_file, '.mat']) % Load simulation data
+
+% Extract data
 u_data  = out.u.Data';
 x_data  = out.x.Data';
-y_data  = x_data([1,3],:); % Measurement data (x and theta)
+y_data  = x_data([1,3],:); % Measurement data (x, z, theta)
 t       = out.tout'; % Time
+
+% Adjust for constant disturbance / mean control values
+u_bar = [5]; % Mean input needed to keep at a fized point
+u_data  = u_data + u_bar; % Adjust for unmeasured input
 
 % Testing data - Last 50 s is for testing and one sample overlaps training 
 N_test = 5000; % Num of data samples for testing
@@ -46,16 +53,16 @@ save_counter = 0; % Save time by saving records only once every few iterations
 % r = Truncated rank of system of X2
 % q = number of delays
 
-N_train_min = 800; % Minimum length of training data
-N_train_max = 5000; % Maximum length of training data
+N_train_min = 3100; % Minimum length of training data
+N_train_max = 3100; % Maximum length of training data
 N_train_increment = 100; % (Minimum incr = 100) Increment value of N_train in Grid search
 
 q_min = 20; % Min value of q in Random search
-q_max = 130; % Max value of q in Random search
+q_max = 100; % Max value of q in Random search
 q_increment = 1; % Increment value of q in Grid search
 
-p_min = 60; % Min value of p in Random search
-p_max = 120; % Max value of p in Random search
+p_min = 10; % Min value of p in Random search
+p_max = 60; % Max value of p in Random search
 p_increment = 1; % Increment value of p in Grid search
 
 N_train_list = N_train_min:N_train_increment:N_train_max; % List of N_train_values to search now
@@ -69,33 +76,33 @@ rng(1); % Repeatable random numbers
 y_data_noise = y_data + sigma*randn(size(y_data));
 
 %% Load saved results
+
 model_name = 'HAVOK'; % Name of prediction model
 sig_str = strrep(num2str(sigma),'.','_'); % Convert sigma value to string
-save_file = ['Data\', model_name, '_N_train_vs_error', '_sig=', sig_str, '.mat'];
+save_file = ['Data\', simulation_data_file, '_', model_name, '_error_sweep', '_sig=', sig_str, '.mat'];
 
-load(save_file);
-% try
-%     load(save_file);
-% catch
-%     disp('No saved results to compare to')  
-%     N_train_saved = [];
-%     time_saved = 0.01;
-% end
+try
+    load(save_file);
+catch
+    disp('No saved results to compare to')  
+    N_train_saved = [];
+    time_saved = 0.01;
+end
 
 %% Load search space records
-search_space_file = ['Data\', model_name, '_search_space_sig=', sig_str, '.mat'];
+search_space_file = ['Data\', simulation_data_file, '_', model_name, '_search_space_sig=', sig_str, '.mat'];
 
-load(search_space_file);
-% try
-%     
-% catch
-%     disp('No search space file')
-%     N_train_record = [];
-%     q_record = [];
-%     p_record = [];    
-%     search_space = zeros(0, 0, 0);
-%     sec_per_iteration = [0.01];
-% end
+
+try
+    load(search_space_file);
+catch
+    disp('No search space file')
+    N_train_record = [];
+    q_record = [];
+    p_record = [];    
+    search_space = zeros(0, 0, 0);
+    sec_per_iteration = [0.01];
+end
 
 
 %% Execution time predicted
