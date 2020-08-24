@@ -1,4 +1,4 @@
-clear all, close all, clc
+close all
 
 m = 1;
 M = 5;
@@ -13,10 +13,13 @@ A = [0 1 0 0;
     0 0 0 1;
     0 -s*d/(M*L) -s*(m+M)*g/(M*L) 0];
 B = [0; 1/M; 0; s*1/(M*L)];
-eig(A)
+eig(A);
 
 C = eye(4);
-sys = ss(A,B,C,0*B);
+% sys = ss(A,B,C,0*B);
+
+A
+B
 
 %%
 
