@@ -46,7 +46,7 @@ N  = length(t);     % Number of data samples
 %% Parameters
 % Very dependant on choice of p, r, q
 
-sigma = 0.001; % Noise standard deviation
+sigma = 0.01; % Noise standard deviation
 
 state_scale = [1; 1; 1]; % Scale MAE of each state by this when comparing models
 
@@ -63,20 +63,20 @@ d = 1; % Row spacing of Hankel matrix (for multiscale dynamics)
 save_interval = 500; % Save time by saving records only once every few iterations
 save_counter = 0; % Counter to reset after saving
 
-N_train_min = 3100; % Minimum length of training data
-N_train_max = 3100; % Maximum length of training data
+N_train_min = 3000; % Minimum length of training data
+N_train_max = 3000; % Maximum length of training data
 N_train_increment = 500; % (Minimum incr = 100) Increment value of N_train in Grid search
 
-q_min = 80; % Min value of q in Random search
+q_min = 20; % Min value of q in Random search
 q_max = 100; % Max value of q in Random search
 q_increment = 1; % Increment value of q in Grid search
 
-p_min = 20; % Min value of p in Random search
-p_max = 40; % Max value of p in Random search
+p_min = 10; % Min value of p in Random search
+p_max = 80; % Max value of p in Random search
 p_increment = 1; % Increment value of p in Grid search
 
-r_p_diff_min = 4; % Min difference between r and p
-r_p_diff_max = 4; % Max difference between r and p 
+r_p_diff_min = l; % Min difference between r and p
+r_p_diff_max = l+8; % Max difference between r and p 
 r_increment = 1; % Increment value of r in Grid search     
 
 N_train_list = N_train_min:N_train_increment:N_train_max; % List of N_train_values to search now
@@ -253,7 +253,7 @@ for index = 1:length(N_train_list) % Loop through N_train_list
                 % Truncate SVD matrixes of Omega
                 U_tilde = U1(:, 1:p); 
                 S_tilde = S1(1:p, 1:p);
-                V_tilde = V1(:, 1:p);
+                V_tilde = V1(:, 1:Me);
                 U1_tilde = U_tilde(1:q*m, :);
                 U2_tilde = U_tilde(q*m+1:end, :);
                 

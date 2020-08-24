@@ -38,8 +38,8 @@ N  = length(t);     % Number of data samples
 %% Parameters
 % Very dependant on choice of p, r, q
 
-sigma = 0.001; % Noise standard deviation
-N_train = 3100; % Number of sampels in training data
+sigma = 0.01; % Noise standard deviation
+N_train = 3000; % Number of sampels in training data
 c = 1; % Column spacing of Hankel matrix (for multiscale dynamics)
 d = 1; % Row spacing of Hankel matrix (for multiscale dynamics)
 % w; % (named 'p' in Multiscale paper) number of columns in Hankel matrix
@@ -67,21 +67,21 @@ try
         q = q_saved(save_index)
         r = r_saved(save_index)
        
-%         % Override
+        % Override
 %         disp('Override')
 %         disp('------------------')
 
 %         q = 60
 %         p = 32
-%         r = 27
+%         r = 28
 
     else
         N_train
         error('No saved results for this N_train value')
         
-        disp('Override')
-        r = 28
-%         q = 4
+%         disp('Override')
+%         r = 28
+% %         q = 4
 %         p = 8
     end
     
