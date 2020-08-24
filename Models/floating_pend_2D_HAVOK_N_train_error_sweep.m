@@ -27,8 +27,8 @@ y_data  = x_data([1:3],:); % Measurement data (x, z, theta)
 t       = out.tout'; % Time
 
 % Adjust for constant disturbance / mean control values
-u_bar = [0; -6*9.81]; % Mean input needed to keep at a fized point
-u_data  = u_data + u_bar; % Adjust for unmeasured input
+u0 = [0; 6*9.81]; % Input needed to keep at a fixed point
+u_data  = u_data - u0; % Adjust for unmeasured input
 
 % Testing data - Last 50 s is for testing and one sample overlaps training 
 N_test = 5000; % Num of data samples for testing
@@ -68,15 +68,15 @@ N_train_max = 3000; % Maximum length of training data
 N_train_increment = 500; % (Minimum incr = 100) Increment value of N_train in Grid search
 
 q_min = 20; % Min value of q in Random search
-q_max = 150; % Max value of q in Random search
+q_max = 80; % Max value of q in Random search
 q_increment = 1; % Increment value of q in Grid search
 
 p_min = 10; % Min value of p in Random search
-p_max = 100; % Max value of p in Random search
+p_max = 80; % Max value of p in Random search
 p_increment = 1; % Increment value of p in Grid search
 
 r_p_diff_min = l; % Min difference between r and p
-r_p_diff_max = l+8; % Max difference between r and p 
+r_p_diff_max = l; % Max difference between r and p 
 r_increment = 1; % Increment value of r in Grid search     
 
 N_train_list = N_train_min:N_train_increment:N_train_max; % List of N_train_values to search now
@@ -100,7 +100,6 @@ catch
     disp('No saved results to compare to')  
     N_train_saved = [];
     MAE_saved = [];
-    r_saved = 0.01;
     
 end
 
@@ -122,6 +121,8 @@ end
 %% Execution time predicted
 num_iterations = length(N_train_list)*length(q_search)*length(p_min:p_increment:p_max)*length(r_p_diff_min:r_increment:r_p_diff_max)
 predicted_hours = mean(sec_per_iteration)*num_iterations/3600
+predicted_mins = mean(sec_per_iteration)*num_iterations/60
+predicted_secs = mean(sec_per_iteration)*num_iterations
 
 %% Loop through different training lengths
 for index = 1:length(N_train_list) % Loop through N_train_list

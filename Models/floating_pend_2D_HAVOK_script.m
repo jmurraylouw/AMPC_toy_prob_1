@@ -19,11 +19,12 @@ y_data  = x_data([1:3],:); % Measurement data (x, z, theta)
 t       = out.tout'; % Time
 
 % Adjust for constant disturbance / mean control values
-u_bar = [0; -6*9.81]; % Mean input needed to keep at a fized point
-u_data  = u_data + u_bar; % Adjust for unmeasured input
+u0 = [0; 6*9.81]; % Input needed to keep at a fixed point
+u_data  = u_data - u0; % Adjust for unmeasured input
 
 % Testing data - Last 50 s is for testing and one sample overlaps training 
 N_test = 5000; % Num of data samples for testing
+x_test = x_data(:,end-N_test+1:end);
 y_test = y_data(:,end-N_test+1:end); % One sample of testing data overlaps for initial condition
 u_test = u_data(:,end-N_test+1:end);
 t_test = t(:,end-N_test+1:end);
@@ -67,13 +68,13 @@ try
         q = q_saved(save_index)
         r = r_saved(save_index)
        
-        % Override
+%         Override
 %         disp('Override')
 %         disp('------------------')
-
-%         q = 60
-%         p = 32
-%         r = 28
+% 
+%         q = 62
+%         p = 50
+%         r = 48
 
     else
         N_train
@@ -87,6 +88,15 @@ try
     
 catch
     error(['Saved results file:', newline, save_file, newline, 'does not exist'])  
+% 
+%     disp(['Saved results file:', newline, save_file, newline, 'does not exist'])  
+% 
+%     disp('Override')
+%     disp('------------------')
+% 
+%     q = 62
+%     p = 30
+%     r = 28
 end
 
 % r = p - 2;
@@ -233,6 +243,33 @@ y_hat2 = Y_hat2(end-m+1:end, :); % Extract only non-delay time series (last m ro
 
 disp('Run model on training data')
 
+%% Compare to model from linearised dynamics
+
+disp('Compare to model from linearised dynamics')
+
+% Get linearised model from other script.
+% Change operating conditions and parameters in script
+[A_lin, B_lin] = linearise_floating_pend_2D();
+
+% Initial condition
+x_hat_2 = zeros(size(x_test)); % Empty estimated y from pre-determined linearised model
+x_hat_2(:,1) = x_test(:,1); % Initial condition
+
+% Run model
+% Solve for small intervals with constant u
+for i=1:N_test-1
+    x0 = x_hat_2(:,i); % initial condition for this time step
+    u = u_test(:,i); %(U_test(i,:) + U_test(i+1,:))/2; % Assume constant u at average of time interval
+    [t_1,x_1] = ode45(@(t_1,x_1) (A_lin*x_1 + B_lin*u), t_test(i:i+1), x0);
+    x_hat_2(:,i+1) = x_1(end,:);
+end
+
+% Extract only measured states
+y_hat_2 = x_hat_2(1:m, :);
+
+% Vector of Mean Absolute Error on testing data
+MAE_lin = sum(abs(y_hat_2 - y_test), 2)./N_test % For each measured state
+
 %% Plot data vs model
 figure;
 plot(t_train, y_train);
@@ -242,6 +279,7 @@ plot(t_test, y_test);
 % plot(t, u_data, ':', 'LineWidth', 1);
 plot(t_test, y_hat, '--', 'LineWidth', 1); % Plot only non-delay coordinate
 plot(t_train, y_hat2, '--', 'LineWidth', 1); % Plot only non-delay coordinate  
+plot(t_test, y_hat_2, 'k:', 'LineWidth', 1); % Plot linearised model
 plot((D + t(N-N_test-N_train)).*[1,1], ylim, 'r');
 plot(t(N-N_test-N_train).*[1,1], ylim, 'k');
 plot(t(N-N_test).*[1,1], ylim, 'k');

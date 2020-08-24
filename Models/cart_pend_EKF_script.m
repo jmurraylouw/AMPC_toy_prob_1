@@ -128,7 +128,8 @@ d = x_hat_data(8,end);
 x0 = [x_test(:,1);m;M;L;d]; % Initial condition
 x_hat = zeros(nx,N_test); % Empty prediction matrix
 x_hat(:,1) = x0; 
-% Generate data with SINDY-PI model
+
+% Run differential equation model
 % Solve for small intervals with constant u
 for i=1:N_test-1
     x0 = x_hat(:,i); % initial condition for this time step
