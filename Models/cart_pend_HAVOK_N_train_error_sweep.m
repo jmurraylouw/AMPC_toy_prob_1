@@ -67,7 +67,6 @@ p_increment = 1; % Increment value of p in Grid search
 
 N_train_list = N_train_min:N_train_increment:N_train_max; % List of N_train_values to search now
 q_search = q_min:q_increment:q_max; % List of q parameters to search in
-q_search = 20:50;
 % p_search defined before p for loop
 
 % Add noise once

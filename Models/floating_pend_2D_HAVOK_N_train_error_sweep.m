@@ -253,7 +253,7 @@ for index = 1:length(N_train_list) % Loop through N_train_list
                 % Truncate SVD matrixes of Omega
                 U_tilde = U1(:, 1:p); 
                 S_tilde = S1(1:p, 1:p);
-                V_tilde = V1(:, 1:Me);
+                V_tilde = V1(:, 1:p);
                 U1_tilde = U_tilde(1:q*m, :);
                 U2_tilde = U_tilde(q*m+1:end, :);
                 
