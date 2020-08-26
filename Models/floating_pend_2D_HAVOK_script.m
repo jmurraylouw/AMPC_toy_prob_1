@@ -19,8 +19,8 @@ y_data  = x_data([1:3],:); % Measurement data (x, z, theta)
 t       = out.tout'; % Time
 
 % Adjust for constant disturbance / mean control values
-u0 = [0; 6*9.81]; % Input needed to keep at a fixed point
-u_data  = u_data - u0; % Adjust for unmeasured input
+u_bar = mean(u_data,2); % Input needed to keep at a fixed point
+u_data  = u_data - u_bar; % Adjust for unmeasured input
 
 % Testing data - Last 50 s is for testing and one sample overlaps training 
 N_test = 5000; % Num of data samples for testing
@@ -39,8 +39,8 @@ N  = length(t);     % Number of data samples
 %% Parameters
 % Very dependant on choice of p, r, q
 
-sigma = 0.01; % Noise standard deviation
-N_train = 3000; % Number of sampels in training data
+sigma = 0.001; % Noise standard deviation
+N_train = 4000; % Number of sampels in training data
 c = 1; % Column spacing of Hankel matrix (for multiscale dynamics)
 d = 1; % Row spacing of Hankel matrix (for multiscale dynamics)
 % w; % (named 'p' in Multiscale paper) number of columns in Hankel matrix
@@ -255,11 +255,13 @@ disp('Compare to model from linearised dynamics')
 x_hat_2 = zeros(size(x_test)); % Empty estimated y from pre-determined linearised model
 x_hat_2(:,1) = x_test(:,1); % Initial condition
 
+%% ???? Fix u used to be real u, not adjusted by u_bar
+
 % Run model
 % Solve for small intervals with constant u
 for i=1:N_test-1
     x0 = x_hat_2(:,i); % initial condition for this time step
-    u = u_test(:,i); %(U_test(i,:) + U_test(i+1,:))/2; % Assume constant u at average of time interval
+    u = u_test(:,i); % Assume constant u at average of time interval
     [t_1,x_1] = ode45(@(t_1,x_1) (A_lin*x_1 + B_lin*u), t_test(i:i+1), x0);
     x_hat_2(:,i+1) = x_1(end,:);
 end

@@ -46,7 +46,7 @@ N  = length(t);     % Number of data samples
 %% Parameters
 % Very dependant on choice of p, r, q
 
-sigma = 0.01; % Noise standard deviation
+sigma = 0.001; % Noise standard deviation
 
 state_scale = [1; 1; 1]; % Scale MAE of each state by this when comparing models
 
@@ -63,12 +63,12 @@ d = 1; % Row spacing of Hankel matrix (for multiscale dynamics)
 save_interval = 500; % Save time by saving records only once every few iterations
 save_counter = 0; % Counter to reset after saving
 
-N_train_min = 3000; % Minimum length of training data
-N_train_max = 3000; % Maximum length of training data
+N_train_min = 4000; % Minimum length of training data
+N_train_max = 4000; % Maximum length of training data
 N_train_increment = 500; % (Minimum incr = 100) Increment value of N_train in Grid search
 
-q_min = 20; % Min value of q in Random search
-q_max = 80; % Max value of q in Random search
+q_min = 30; % Min value of q in Random search
+q_max = 40; % Max value of q in Random search
 q_increment = 1; % Increment value of q in Grid search
 
 p_min = 10; % Min value of p in Random search
