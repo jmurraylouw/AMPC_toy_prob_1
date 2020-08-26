@@ -67,12 +67,12 @@ N_train_min = 4000; % Minimum length of training data
 N_train_max = 4000; % Maximum length of training data
 N_train_increment = 500; % (Minimum incr = 100) Increment value of N_train in Grid search
 
-q_min = 20; % Min value of q in Random search
+q_min = 60; % Min value of q in Random search
 q_max = 200; % Max value of q in Random search
 q_increment = 1; % Increment value of q in Grid search
 
-p_min = 10; % Min value of p in Random search
-p_max = 200; % Max value of p in Random search
+p_min = 150; % Min value of p in Random search
+p_max = 300; % Max value of p in Random search
 p_increment = 1; % Increment value of p in Grid search
 
 r_p_diff_min = l; % Min difference between r and p
