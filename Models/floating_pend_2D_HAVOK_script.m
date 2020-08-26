@@ -112,8 +112,8 @@ t_train = t(:, end-N_test-N_train+2:end-N_test+1);
 timer_model = tic; % Start timer for this model evaluation
 
 % Step 1: Collect and construct the snapshot matrices:
-% According to: Discovery of Nonlinear Multiscale Systems: Sampling Strategies and Embeddings
-% pg. 15 Delay spacing for multiscale dynamics
+% According to paper: DYNAMIC MODE DECOMPOSITION WITH CONTROL, 
+% by Proctor et. al.
 
 X = zeros(q*m,w); % Augmented state with delay coordinates [Y(k); Y(k-1*tau); Y(k-2*tau); ...]
 X2 = zeros(q*m,w); % X one step into future
@@ -281,7 +281,7 @@ plot(t_test, y_test);
 % plot(t, u_data, ':', 'LineWidth', 1);
 plot(t_test, y_hat, '--', 'LineWidth', 1); % Plot only non-delay coordinate
 plot(t_train, y_hat2, '--', 'LineWidth', 1); % Plot only non-delay coordinate  
-plot(t_test, y_hat_2, 'k:', 'LineWidth', 1); % Plot linearised model
+% plot(t_test, y_hat_2, 'k:', 'LineWidth', 1); % Plot linearised model
 plot((D + t(N-N_test-N_train)).*[1,1], ylim, 'r');
 plot(t(N-N_test-N_train).*[1,1], ylim, 'k');
 plot(t(N-N_test).*[1,1], ylim, 'k');
