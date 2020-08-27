@@ -21,8 +21,8 @@ y_data  = x_data([1,3],:); % Measurement data (x, z, theta)
 t       = out.tout'; % Time
 
 % Adjust for constant disturbance / mean control values
-u_bar = [5]; % Mean input needed to keep at a fized point
-u_data  = u_data + u_bar; % Adjust for unmeasured input
+u_bar = [-5]; % Mean input needed to keep at a fized point
+% u_data  = u_data - u_bar; % Adjust for unmeasured input
 
 % Testing data - Last 50 s is for testing and one sample overlaps training 
 N_test = 5000; % Num of data samples for testing
@@ -90,10 +90,13 @@ try
     end
     
 catch
-    error('Saved results file does not exist')  
+    disp('Saved results file does not exist')  
+    q = 50
+    p = 30
+    
 end
         
-r = p-l-4; % Reduced rank of X2 svd, r < p, (minus number of inputs from rank)
+r = p-l; % Reduced rank of X2 svd, r < p, (minus number of inputs from rank)
 w = N_train - q; % num columns of Hankel matrix
 D = (q-1)*d*Ts; % Delay duration (Dynamics in delay embedding)
 
@@ -114,7 +117,7 @@ for row = 0:q-1 % Add delay coordinates
     X2(row*m+1:(row+1)*m, :) = y_train(:, row*d + (0:w-1)*c + 2);
 end
 
-Upsilon = u_train(:, row*d + (0:w-1)*c + 1); % Upsilon, same indexes as last X row
+Upsilon = u_train(:, row*d + (0:w-1)*c + 1) - u_bar; % Upsilon, same indexes as last X row
 
 Omega = [X; Upsilon]; % Omega is concatination of Y and Upsilon
 
@@ -206,7 +209,7 @@ end
 Y_hat = zeros(length(y_hat_0),N_test); % Empty estimated Y
 Y_hat(:,1) = y_hat_0; % Initial condition
 for k = 1:N_test-1
-    Y_hat(:,k+1) = A*Y_hat(:,k) + B*u_test(:,k);
+    Y_hat(:,k+1) = A*Y_hat(:,k) + B*(u_test(:,k) - u_bar);
 end
 
 y_hat = Y_hat(end-m+1:end, :); % Extract only non-delay time series (last m rows)
@@ -227,7 +230,7 @@ k_start = row*d + 1; % First k to start at
 Y_hat2 = zeros(length(y_hat_0),N_train); % ??? Estimated X from model
 Y_hat2(:,k_start) = y_hat_02; % Initial conditions, insert at first k
 for k = k_start:N_train-1
-    Y_hat2(:,k+1) = A*Y_hat2(:,k) + B*u_train(:,k);
+    Y_hat2(:,k+1) = A*Y_hat2(:,k) + B*(u_train(:,k) - u_bar);
 end
 y_hat2 = Y_hat2(end-m+1:end, :); % Extract only non-delay time series (last m rows)
 
