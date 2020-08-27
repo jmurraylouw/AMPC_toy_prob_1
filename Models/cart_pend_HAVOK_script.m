@@ -26,6 +26,7 @@ u_bar = [-5]; % Mean input needed to keep at a fized point
 
 % Testing data - Last 50 s is for testing and one sample overlaps training 
 N_test = 5000; % Num of data samples for testing
+x_test = x_data(:,end-N_test+1:end)
 y_test = y_data(:,end-N_test+1:end); % One sample of testing data overlaps for initial condition
 u_test = u_data(:,end-N_test+1:end);
 t_test = t(:,end-N_test+1:end);
@@ -236,6 +237,29 @@ y_hat2 = Y_hat2(end-m+1:end, :); % Extract only non-delay time series (last m ro
 
 disp('Run model on training data')
 
+%% Compare to linearised model
+
+f = @cartpend;
+[A_lin, B_lin] = linearise_floating_pend_2D(f,zeros(n,1),u_bar) % Get linearised model
+
+% Initial condition
+x_hat3 = zeros(size(x_test)); % Empty estimated y from pre-determined linearised model
+x_hat3(:,1) = x_test(:,1); % Initial condition
+
+% Run model
+% Solve for small intervals with constant u
+for i=1:N_test-1
+    x00 = x_hat3(:,i); % initial condition for this time step
+    u = u_test(:,i); % Assume constant u at average of time interval
+%     [t_1,x_1] = ode45(@(t_1,x_1) cartpend(x_1,u), t_test(i:i+1), x00);
+    [t_1,x_1] = ode45(@(t_1,x_1) (A_lin*x_1 + B_lin*(u - u_bar)), t_test(i:i+1), x00);
+    x_hat3(:,i+1) = x_1(end,:);
+end
+
+y_hat3 = x_hat3([1,3],:); % Extract measurements
+
+MAE_lin = sum(abs(y_hat3 - y_test), 2)./N_test % MAE for linearised model
+
 %% Plot data vs model
 figure;
 plot(t_train, y_train);
@@ -245,6 +269,7 @@ plot(t_test, y_test);
 plot(t, u_data, ':', 'LineWidth', 1);
 plot(t_test, y_hat, '--', 'LineWidth', 1); % Plot only non-delay coordinate
 plot(t_train, y_hat2, '--', 'LineWidth', 1); % Plot only non-delay coordinate  
+plot(t_test, y_hat3, ':', 'LineWidth', 1); % Plot linearised model results
 plot((D + t(N-N_test-N_train)).*[1,1], ylim, 'r');
 plot(t(N-N_test-N_train).*[1,1], ylim, 'k');
 plot(t(N-N_test).*[1,1], ylim, 'k');
@@ -286,7 +311,42 @@ function new_array = insert(array, index, entry)
     end
 end
 
+function dx = cartpend(x,u)
+    
+    %CARTPEND Models a continuous system of a pendulem on a cart.
+    %   based on Steve Brunton code. See youtube.com/watch?v=qjhAAQexzLg&list=PLMrJAkhIeNNR20Mz-VpzgfQs5zrYi085m&index=12
+    %   x  = state vector [x; x_dot; theta; theta_dot]
+    %   dx = derivative of state vector
+    %   u  = input vector [f]
+    %   m  = mass of pendulem end
+    %   M  = mass of cart
+    %   L  = length of pendulem rod
+    %   g  = acceleration due to gravity
+    %   d  = damping coef of friction on cart
+    %,m,M,L,g,d,u
+    
+    u_disturb = 5;
+    
+    m = 2;
+    M = 4;
+    L = 1;
+    g = -9.81;
+    d = 5;
+    
+    % Derivatives
+    dx = zeros(4,1);
 
+    Sx = sin(x(3));
+    Cx = cos(x(3));
+    D = m*L*L*(M+m*(1-Cx^2));
+
+    % Equations from derive_cartpend.m
+    dx(1,1) = x(2);
+    dx(2,1) = (1/D)*(-m^2*L^2*g*Cx*Sx + m*L^2*(m*L*x(4)^2*Sx - d*x(2))) + m*L*L*(1/D)*(u + u_disturb);
+    dx(3,1) = x(4);
+    dx(4,1) = (1/D)*((m+M)*m*g*L*Sx - m*L*Cx*(m*L*x(4)^2*Sx - d*x(2))) - m*L*Cx*(1/D)*(u + u_disturb); % +.01*randn;
+
+end
 
 
 

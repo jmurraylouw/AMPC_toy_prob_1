@@ -1,11 +1,11 @@
-function [A_lin, B_lin] = linearise_floating_pend_2D()
+function [A_lin, B_lin] = linearise_floating_pend_2D(f,x0,u0)
 %% linearise_floating_pend_2D
 % determine A, B, C matrixes for linear model of floating pendulum in 2D
 
-x0 = [0; 0; 0; 0; 0; 0];
-u0 = [0; 6*9.81];
-f = @floating_pendulum_2D; % Non-linear model to linearise
-f(x0, u0); % Check if f(x0, u0) = =0
+% x0 = [0; 0; 0; 0; 0; 0];
+% u0 = [0; 6*9.81];
+% f = @floating_pendulum_2D; % Non-linear model to linearise
+f(x0, u0) % Check if f(x0, u0) = =0
 
 A_lin = df_dx(f, x0, u0); % Linearised matrix
 B_lin = df_du(f, x0, u0);
@@ -102,12 +102,12 @@ function dx = cartpend(x,u)
     %   d  = damping coef of friction on cart
     %,m,M,L,g,d,u
     
-    m = 1;
-    M = 5;
-    L = 2;
-    g = -10;
-    d = 1;
-    
+    m = 2;
+    M = 4;
+    L = 1;
+    g = -9.81;
+    d = 5;
+        
     % Derivatives
     dx = zeros(4,1);
 

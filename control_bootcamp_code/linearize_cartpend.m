@@ -1,12 +1,12 @@
 close all
 
-m = 1;
-M = 5;
-L = 2;
-g = -10;
-d = 1;
+m = 2;
+M = 4;
+L = 1;
+g = -9.81;
+d = 5;
 
-s = 1; % pendulum up (s=1)
+s = -1; % pendulum up (s=1)
 
 A = [0 1 0 0;
     0 -d/M -m*g/M 0;
