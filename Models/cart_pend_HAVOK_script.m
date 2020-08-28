@@ -239,8 +239,8 @@ disp('Run model on training data')
 
 %% Compare to linearised model
 
-f = @cartpend;
-[A_lin, B_lin] = linearise_floating_pend_2D(f,zeros(n,1),u_bar) % Get linearised model
+f = @cartpend; % ODE to linearise
+[A_lin, B_lin] = linearise_floating_pend_2D(f,zeros(n,1),u_bar); % Get linearised model
 
 % Initial condition
 x_hat3 = zeros(size(x_test)); % Empty estimated y from pre-determined linearised model
