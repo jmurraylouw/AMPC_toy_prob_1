@@ -15,7 +15,7 @@ f = @nl_msd; % Model for this simulation
 % Input data
 u_data = zeros(1, length(t));
 rand_u = 0;
-rand_interval = 2; % Size of
+rand_interval = 10; % Size of
 sigma_u = 1;
 
 for i = 1:length(t)
@@ -41,16 +41,16 @@ end
 
 % Extract data
 u_data  = u_data;
-x_data  = x';
+x_data  = x;
 y_data  = x_data([1,2],:); % Measurement data (x, z, theta)
-t       = t';
+t       = t;
 
 % Testing data - Last 50 s is for testing and one sample overlaps training 
 N_test = 5000; % Num of data samples for testing
-x_test = x_data(:, (end-N_test+1):end);
-y_test = y_data(:, (end-N_test+1):end); % One sample of testing data overlaps for initial condition
-u_test = u_data(:, (end-N_test+1):end);
-t_test =      t(:, (end-N_test+1):end);
+x_test = x_data(:,end-N_test+1:end);
+y_test = y_data(:,end-N_test+1:end); % One sample of testing data overlaps for initial condition
+u_test = u_data(:,end-N_test+1:end);
+t_test = t(:,end-N_test+1:end);
 
 % Data dimentions
 n = size(x_data,1); % number of states
@@ -64,14 +64,15 @@ sigma = 0; % Noise standard deviation
 y_data_noise = y_data + sigma*randn(size(y_data));
 
 % Training data - Last sample of training is first sample of testing
-N_train = 5000; % Number of sampels in training data
+N_train = 4000; % Number of sampels in training data
 y_train = y_data_noise(:,end-N_test-N_train+2:end-N_test+1); % Use noisy data
 u_train = u_data(:,end-N_test-N_train+2:end-N_test+1);
 t_train = t(:,end-N_test-N_train+2:end-N_test+1);
 
+%%
 % Parameters
 q = 400;
-p = 300;
+p = 200;
 w = N_train - q + 1; % num columns of Hankel matrix
 D = (q-1)*Ts; % Delay duration (Dynamics in delay embedding)
 
@@ -96,6 +97,7 @@ V_tilde = V1(:, 1:p);
 V_til_2 = V_tilde(2:end  , :)'; % Turnd on side (wide short matrix)
 V_til_1 = V_tilde(1:end-1, :)';
 
+% DMD on V
 % Based on DMD control example video by Steve Brunton
 U = u_train(:, q:end-1); % Leave out last time step to match V_til_1
 VU = [V_til_1; U]; % Combined matrix of V and U, above and below
@@ -103,17 +105,17 @@ AB = V_til_2*pinv(VU); % combined A and B matrix, side by side
 A_tilde  = AB(:,1:p); % Extract A matrix
 B_tilde  = AB(:,(p+1):end);
 
-% DMD on V
-% A_tilde = V_til_2*pinv(V_til_1); % Matrix to propogate V' forward in time. Note transpose to turn V into fat/horizontal matrix
-
 % convert to x coordinates
-A = (U_tilde*S_tilde)*A_tilde*pinv(U_tilde*S_tilde);
+% A = (U_tilde*S_tilde)*A_tilde*pinv(U_tilde*S_tilde);
 
-% DMD
+% DMD of Y
 Y2 = Y(:, 2:end  );
 Y1 = Y(:, 1:end-1);
 
-A = Y2*pinv(Y1);
+YU = [Y1; U]; % Combined matrix of V and U, above and below
+AB = Y2*pinv(YU); % combined A and B matrix, side by side
+A  = AB(:,1:q*m); % Extract A matrix
+B  = AB(:,(q*m+1):end);
 
 %% Compare to testing data
 
@@ -150,7 +152,7 @@ end
 Y_hat = zeros(length(y_hat_0),N_test); % Empty estimated Y
 Y_hat(:,1) = y_hat_0; % Initial condition
 for k = 1:N_test-1
-    Y_hat(:,k+1) = A*Y_hat(:,k);
+    Y_hat(:,k+1) = A*Y_hat(:,k) + B*u_test(:,k);
 end
 
 y_hat = Y_hat(end-m+1:end, :); % Extract only non-delay time series (last m rows)
@@ -167,7 +169,7 @@ plot(t_train, y_train);
 hold on;
 plot(t_test, y_test);
 
-plot(t_test, y_hat, '--', 'LineWidth', 1); % Plot only non-delay coordinate
+plot(t_test, y_hat2, '--', 'LineWidth', 1); % Plot only non-delay coordinate
 plot((D + t(N-N_test-N_train)).*[1,1], ylim, 'r');
 plot(t(N-N_test-N_train).*[1,1], ylim, 'k');
 plot(t(N-N_test).*[1,1], ylim, 'k');
