@@ -1,49 +1,78 @@
 % Implentation of Hankel Alternative View Of Koopman
 
 close all
+rng('default');
+rng(1); % Repeatable random numbers
 
-% Create data from simulation
-tspan = 0:0.01:100; % Simulation time period
+% Simulation parameters
+Ts = 0.01; % Sample time
+t = 0:Ts:100; % Simulation time period
+N = length(t);
 x0 = [0.5; 0]; % Initial conditions
+n = length(x0);
+f = @nl_msd; % Model for this simulation
 
-[t,x] = ode45(@(t,x) nl_msd(x,0), tspan, x0); % simulate with no input
+% Input data
+u_data = zeros(1, length(t));
+rand_u = 0;
+rand_interval = 2; % Size of
+sigma_u = 1;
+
+for i = 1:length(t)
+    if mod(i, rand_interval/Ts) == 0 % Only take new random input value every few seconds
+        rand_u = sigma_u*randn(1,1);
+    end
+    u_data(:,i) = rand_u;
+end
+
+% Run simulation
+% [t,x] = ode45(@(t,x) nl_msd(x,0), tspan, x0); % simulate with no input
+
+% Solve for small intervals with constant u
+x = zeros(n,N); % Empty prediction matrix
+x(:,1) = x0; 
+
+for i = 1:N - 1
+    x00 = x(:,i); % Initial condition for this timestep
+    u = u_data(:,i); %(U_test(i,:) + U_test(i+1,:))/2; % Assume constant u at average of time interval
+    [t_1,x_1] = ode45(@(t_1,x_1) f(x_1,u), t(i:i+1), x00);
+    x(:,i+1) = x_1(end,:)';
+end
 
 % Extract data
-% u_data  = out.u.Data';
+u_data  = u_data;
 x_data  = x';
 y_data  = x_data([1,2],:); % Measurement data (x, z, theta)
 t       = t';
 
 % Testing data - Last 50 s is for testing and one sample overlaps training 
 N_test = 5000; % Num of data samples for testing
-x_test = x_data(:,end-N_test+1:end);
-y_test = y_data(:,end-N_test+1:end); % One sample of testing data overlaps for initial condition
-% u_test = u_data(:,end-N_test+1:end);
-t_test = t(:,end-N_test+1:end);
+x_test = x_data(:, (end-N_test+1):end);
+y_test = y_data(:, (end-N_test+1):end); % One sample of testing data overlaps for initial condition
+u_test = u_data(:, (end-N_test+1):end);
+t_test =      t(:, (end-N_test+1):end);
 
 % Data dimentions
 n = size(x_data,1); % number of states
 m = size(y_data,1); % number of measurements
-% l = size(u_data,1); % number of inputs
+l = size(u_data,1); % number of inputs
 Ts = t(2)-t(1);     % Sample time of data
 N  = length(t);     % Number of data samples
 
 % Add noise
-rng('default');
-rng(1); % Repeatable random numbers
 sigma = 0; % Noise standard deviation
 y_data_noise = y_data + sigma*randn(size(y_data));
 
 % Training data - Last sample of training is first sample of testing
 N_train = 5000; % Number of sampels in training data
 y_train = y_data_noise(:,end-N_test-N_train+2:end-N_test+1); % Use noisy data
-% u_train = u_data(:,end-N_test-N_train+2:end-N_test+1);
+u_train = u_data(:,end-N_test-N_train+2:end-N_test+1);
 t_train = t(:,end-N_test-N_train+2:end-N_test+1);
 
 % Parameters
 q = 400;
 p = 300;
-w = N_train - q; % num columns of Hankel matrix
+w = N_train - q + 1; % num columns of Hankel matrix
 D = (q-1)*Ts; % Delay duration (Dynamics in delay embedding)
 
 % Create Hankel matrix with measurements
@@ -55,7 +84,7 @@ end
 % SVD of the Hankel matrix
 [U1,S1,V1] = svd(Y, 'econ');
 % figure, semilogy(diag(S1), 'x'), hold on;
-title('Singular values of Omega, showing p truncation')
+% title('Singular values of Omega, showing p truncation')
 % plot(p,S1(p,p), 'ro'), hold off;
 
 % Truncate SVD matrixes
@@ -64,20 +93,27 @@ S_tilde = S1(1:p, 1:p);
 V_tilde = V1(:, 1:p);
 
 % Setup V2 one timestep into future from V1
-V_til_2 = V_tilde(2:end  , :);
-V_til_1 = V_tilde(1:end-1, :);
+V_til_2 = V_tilde(2:end  , :)'; % Turnd on side (wide short matrix)
+V_til_1 = V_tilde(1:end-1, :)';
+
+% Based on DMD control example video by Steve Brunton
+U = u_train(:, q:end-1); % Leave out last time step to match V_til_1
+VU = [V_til_1; U]; % Combined matrix of V and U, above and below
+AB = V_til_2*pinv(VU); % combined A and B matrix, side by side
+A_tilde  = AB(:,1:p); % Extract A matrix
+B_tilde  = AB(:,(p+1):end);
 
 % DMD on V
-A_tilde = V_til_2'*pinv(V_til_1'); % Matrix to propogate V' forward in time. Note transpose to turn V into fat/horizontal matrix
+% A_tilde = V_til_2*pinv(V_til_1); % Matrix to propogate V' forward in time. Note transpose to turn V into fat/horizontal matrix
 
 % convert to x coordinates
 A = (U_tilde*S_tilde)*A_tilde*pinv(U_tilde*S_tilde);
 
 % DMD
-% Y2 = Y(:, 2:end  );
-% Y1 = Y(:, 1:end-1);
-% 
-% A = Y2*pinv(Y1);
+Y2 = Y(:, 2:end  );
+Y1 = Y(:, 1:end-1);
+
+A = Y2*pinv(Y1);
 
 %% Compare to testing data
 
@@ -92,7 +128,7 @@ v_hat_0 = V_tilde(end,:)';
 V_hat = zeros(length(v_hat_0),N_test); % Empty estimated Y
 V_hat(:,1) = v_hat_0; % Initial condition
 for k = 1:N_test-1
-    V_hat(:,k+1) = A_tilde*V_hat(:,k);
+    V_hat(:,k+1) = A_tilde*V_hat(:,k) + B_tilde*u_test(:,k);
 end
 
 Y_hat2 = (U_tilde*S_tilde)*V_hat; % Convert to Y
@@ -147,7 +183,7 @@ function dx = nl_msd(x,u)
     m = 1;
     k = 1.1;
     k_nl = 0.8;
-    c = 0.1;
+    c = 0.05;
     
     % State space ODE
     dx(1,1) = 1/m*(x(2));
