@@ -1,8 +1,12 @@
-% Create data from simulation
-tspan = 0:0.01:100;
-x0 = [0.5; 0];
+% Implentation of Hankel Alternative View Of Koopman
 
-[t,x] = ode45(@(t,x) nl_msd(x,0), tspan, x0);
+close all
+
+% Create data from simulation
+tspan = 0:0.01:100; % Simulation time period
+x0 = [0.5; 0]; % Initial conditions
+
+[t,x] = ode45(@(t,x) nl_msd(x,0), tspan, x0); % simulate with no input
 
 % Extract data
 % u_data  = out.u.Data';
@@ -37,19 +41,19 @@ y_train = y_data_noise(:,end-N_test-N_train+2:end-N_test+1); % Use noisy data
 t_train = t(:,end-N_test-N_train+2:end-N_test+1);
 
 % Parameters
-q = 10;
-p = 5;
+q = 400;
+p = 300;
 w = N_train - q; % num columns of Hankel matrix
 D = (q-1)*Ts; % Delay duration (Dynamics in delay embedding)
 
-% Create Hankel matrix
+% Create Hankel matrix with measurements
 Y = zeros(q*m,w); % Augmented state with delay coordinates [Y(k); Y(k-1*tau); Y(k-2*tau); ...]
 for row = 0:q-1 % Add delay coordinates
     Y(row*m+1:(row+1)*m, :) = y_train(:, row + (0:w-1) + 1);
 end
 
 % SVD of the Hankel matrix
-[U1,S1,V_til_1] = svd(Y, 'econ');
+[U1,S1,V1] = svd(Y, 'econ');
 % figure, semilogy(diag(S1), 'x'), hold on;
 title('Singular values of Omega, showing p truncation')
 % plot(p,S1(p,p), 'ro'), hold off;
@@ -57,7 +61,7 @@ title('Singular values of Omega, showing p truncation')
 % Truncate SVD matrixes
 U_tilde = U1(:, 1:p); 
 S_tilde = S1(1:p, 1:p);
-V_tilde = V_til_1(:, 1:p);
+V_tilde = V1(:, 1:p);
 
 % Setup V2 one timestep into future from V1
 V_til_2 = V_tilde(2:end  , :);
@@ -67,9 +71,39 @@ V_til_1 = V_tilde(1:end-1, :);
 A_tilde = V_til_2'*pinv(V_til_1'); % Matrix to propogate V' forward in time. Note transpose to turn V into fat/horizontal matrix
 
 % convert to x coordinates
-A = U_tilde*S_tilde*A_tilde;
+A = (U_tilde*S_tilde)*A_tilde*pinv(U_tilde*S_tilde);
+
+% DMD
+% Y2 = Y(:, 2:end  );
+% Y1 = Y(:, 1:end-1);
+% 
+% A = Y2*pinv(Y1);
 
 %% Compare to testing data
+
+%% Run with A_tilde and v
+figure;
+plot(V1(:,1:5))
+
+% Initial condition
+v_hat_0 = V_tilde(end,:)';
+
+% Run model
+V_hat = zeros(length(v_hat_0),N_test); % Empty estimated Y
+V_hat(:,1) = v_hat_0; % Initial condition
+for k = 1:N_test-1
+    V_hat(:,k+1) = A_tilde*V_hat(:,k);
+end
+
+Y_hat2 = (U_tilde*S_tilde)*V_hat; % Convert to Y
+y_hat2 = Y_hat2(end-m+1:end, :); % Extract only non-delay time series (last m rows)
+
+% Vector of Mean Absolute Error on testing data
+MAE_til = sum(abs(y_hat2 - y_test), 2)./N_test % For each measured state
+
+
+%% Run with A and x
+
 % Initial condition
 y_hat_0 = zeros(q*m,1);
 for row = 0:q-1 % First column of spaced Hankel matrix
@@ -88,6 +122,21 @@ y_hat = Y_hat(end-m+1:end, :); % Extract only non-delay time series (last m rows
 % Vector of Mean Absolute Error on testing data
 MAE = sum(abs(y_hat - y_test), 2)./N_test % For each measured state
 
+%% Compare MAE and MAE_til
+MAE_error_percent = (MAE - MAE_til)./MAE_til*100
+
+%% Plot data vs model
+figure;
+plot(t_train, y_train);
+hold on;
+plot(t_test, y_test);
+
+plot(t_test, y_hat, '--', 'LineWidth', 1); % Plot only non-delay coordinate
+plot((D + t(N-N_test-N_train)).*[1,1], ylim, 'r');
+plot(t(N-N_test-N_train).*[1,1], ylim, 'k');
+plot(t(N-N_test).*[1,1], ylim, 'k');
+title('Training and Testing data vs Model');
+hold off;
 
 
 function dx = nl_msd(x,u)
@@ -97,7 +146,7 @@ function dx = nl_msd(x,u)
     % Parameters
     m = 1;
     k = 1.1;
-    k_nl = 0.9;
+    k_nl = 0.8;
     c = 0.1;
     
     % State space ODE
