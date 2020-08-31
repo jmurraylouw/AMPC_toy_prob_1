@@ -49,7 +49,7 @@ for row = 0:q-1 % Add delay coordinates
 end
 
 % SVD of the Hankel matrix
-[U1,S1,V1] = svd(Y, 'econ');
+[U1,S1,V_til_1] = svd(Y, 'econ');
 % figure, semilogy(diag(S1), 'x'), hold on;
 title('Singular values of Omega, showing p truncation')
 % plot(p,S1(p,p), 'ro'), hold off;
@@ -57,21 +57,21 @@ title('Singular values of Omega, showing p truncation')
 % Truncate SVD matrixes
 U_tilde = U1(:, 1:p); 
 S_tilde = S1(1:p, 1:p);
-V_tilde = V1(:, 1:p);
+V_tilde = V_til_1(:, 1:p);
 
 % Setup V2 one timestep into future from V1
-V2 = V_tilde(2:end  , :);
-V1 = V_tilde(1:end-1, :);
+V_til_2 = V_tilde(2:end  , :);
+V_til_1 = V_tilde(1:end-1, :);
 
 % DMD on V
-A_tilde = V2'*pinv(V1'); % Matrix to propogate V' forward in time. Note transpose to turn V into fat/horizontal matrix
+A_tilde = V_til_2'*pinv(V_til_1'); % Matrix to propogate V' forward in time. Note transpose to turn V into fat/horizontal matrix
 
 % convert to x coordinates
 A = U_tilde*S_tilde*A_tilde;
 
 %% Compare to testing data
 % Initial condition
-y_hat_0 = zeros(p*m,1);
+y_hat_0 = zeros(q*m,1);
 for row = 0:q-1 % First column of spaced Hankel matrix
     y_hat_0(row*m+1:(row+1)*m, 1) = y_train(:, end - ((q-1)+1) + row + 1);
 end
