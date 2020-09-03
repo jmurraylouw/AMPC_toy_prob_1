@@ -63,7 +63,7 @@ for i = 1:m % Mae column for each measured state
 end
 Size = [length(q_search)*length(p_min:p_increment:p_max), length(VariableTypes)];
 
-% Read results
+% Read previous results
 sig_str = strrep(num2str(sigma),'.','_'); % Convert sigma value to string
 results_file = ['Data/havok_results_', simulation_data_file, '_sig=', sig_str, '.mat'];
 
