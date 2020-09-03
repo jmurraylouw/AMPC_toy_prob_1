@@ -3,7 +3,7 @@ close all;
 
 % load('cartpend_random_1.mat') % Load simulation data
 % load('Data/cartpend_disturbance_and_PID_1.mat') % Load simulation data
-simulation_data_file = 'floating_pend_2D_data_1';
+simulation_data_file = 'floating_pend_2D_data_3';
 load(['Data/', simulation_data_file, '.mat']) % Load simulation data
 
 % Extract data
@@ -14,7 +14,7 @@ t       = out.tout'; % Time
 
 % Adjust for constant disturbance / mean control values
 u_bar = mean(u_data,2); % Input needed to keep at a fixed point
-u_bar = [0; 6*9.81-0.1];
+% u_bar = [0; 6*9.81];
 u_data  = u_data - u_bar; % Adjust for unmeasured input
 
 % Testing data - Last 50 s is for testing and one sample overlaps training 
@@ -34,18 +34,19 @@ N  = length(t);     % Number of data samples
 % Add noise
 rng('default');
 rng(1); % Repeatable random numbers
-sigma = 0.01; % Noise standard deviation
+sigma = 0.01
+; % Noise standard deviation
 y_data_noise = y_data + sigma*randn(size(y_data));
 
 % Training data - Last sample of training is first sample of testing
-N_train = 3000; % Number of sampels in training data
+N_train = 4000; % Number of sampels in training data
 y_train = y_data_noise(:,end-N_test-N_train+2:end-N_test+1); % Use noisy data
 u_train = u_data(:,end-N_test-N_train+2:end-N_test+1);
 t_train = t(:,end-N_test-N_train+2:end-N_test+1);
 
 % Parameters
-q = 400;
-p = 1000;
+q = 60;
+p = 30;
 w = N_train - q + 1; % num columns of Hankel matrix
 D = (q-1)*Ts; % Delay duration (Dynamics in delay embedding)
 
@@ -81,6 +82,9 @@ AB_bar = (U_tilde*S_tilde)*AB_tilde*pinv(U_tilde*S_tilde);
 A_bar = AB_bar(1:q*m, 1:q*m);
 B_bar = AB_bar(1:q*m, q*m+1:end);
 
+A_bar = stabilise(A_bar,10);
+
+
 % DMD of Y
 Y2 = Y(:, 2:end  );
 Y1 = Y(:, 1:end-1);
@@ -89,6 +93,8 @@ YU = [Y1; Upsilon(:,1:end-1)]; % Combined matrix of Y and U, above and below
 AB = Y2*pinv(YU); % combined A and B matrix, side by side
 A  = AB(:,1:q*m); % Extract A matrix
 B  = AB(:,(q*m+1):end);
+
+A = stabilise(A,10);
 
 % Compare to testing data
 
@@ -152,6 +158,27 @@ plot(t(N-N_test).*[1,1], ylim, 'k');
 title('Training and Testing data vs Model');
 hold off;
 
+function A = stabilise(A_unstable,max_iterations)
+    % If some eigenvalues are unstable due to machine tolerance,
+    % Scale them to be stable
+    A = A_unstable;
+    count = 0;
+    while (sum(abs(eig(A)) > 1) ~= 0) 
+        count = count+1;
+        [Ve,De] = eig(A);
+        unstable = abs(De)>1; % indexes of unstable eigenvalues
+        De(unstable) = De(unstable)./abs(De(unstable)) - 10^(-16+count); % Normalize all unstable eigenvalues (set abs(eig) = 1)
+        A = Ve*De/(Ve); % New A with margininally stable eigenvalues
+        A = real(A);
+        if(count>10)
+            break
+        end
+    end
+
+    if (sum(abs(eig(A)) > 1) ~= 0) % If eigenvalues are still unstable
+        error('Eigenvalues are unstable'); % Exit this p loop if still unstable
+    end
+end
 
 function dx = nl_msd(x,u)
     % Non-linear mass spring damper
@@ -167,3 +194,4 @@ function dx = nl_msd(x,u)
     dx(1,1) = 1/m*(x(2));
     dx(2,1) = 1/m*(-c*x(2) - k*x(1) - k_nl*abs(x(1)) + u);
 end
+
