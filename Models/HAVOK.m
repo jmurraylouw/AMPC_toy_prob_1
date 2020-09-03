@@ -1,49 +1,21 @@
 % Implentation of Hankel Alternative View Of Koopman
+close all;
 
-close all
-rng('default');
-rng(1); % Repeatable random numbers
-
-% Simulation parameters
-Ts = 0.01; % Sample time
-t = 0:Ts:100; % Simulation time period
-N = length(t);
-x0 = [0.5; 0]; % Initial conditions
-n = length(x0);
-f = @nl_msd; % Model for this simulation
-
-% Input data
-u_data = zeros(1, length(t));
-rand_u = 0;
-rand_interval = 5; % Size of
-sigma_u = 1;
-
-for i = 1:length(t)
-    if mod(i, rand_interval/Ts) == 0 % Only take new random input value every few seconds
-        rand_u = sigma_u*randn(1,1);
-    end
-    u_data(:,i) = rand_u;
-end
-
-% Run simulation
-% [t,x] = ode45(@(t,x) nl_msd(x,0), tspan, x0); % simulate with no input
-
-% Solve for small intervals with constant u
-x = zeros(n,N); % Empty prediction matrix
-x(:,1) = x0; 
-
-for i = 1:N - 1
-    x00 = x(:,i); % Initial condition for this timestep
-    u = u_data(:,i); %(U_test(i,:) + U_test(i+1,:))/2; % Assume constant u at average of time interval
-    [t_1,x_1] = ode45(@(t_1,x_1) f(x_1,u), t(i:i+1), x00);
-    x(:,i+1) = x_1(end,:)';
-end
+% load('cartpend_random_1.mat') % Load simulation data
+% load('Data/cartpend_disturbance_and_PID_1.mat') % Load simulation data
+simulation_data_file = 'floating_pend_2D_data_1';
+load(['Data/', simulation_data_file, '.mat']) % Load simulation data
 
 % Extract data
-u_data  = u_data;
-x_data  = x;
-y_data  = x_data([1,2],:); % Measurement data (x, z, theta)
-t       = t;
+u_data  = out.u.Data';
+x_data  = out.x.Data';
+y_data  = x_data([1,2,3],:); % Measurement data (x, z, theta)
+t       = out.tout'; % Time
+
+% Adjust for constant disturbance / mean control values
+u_bar = mean(u_data,2); % Input needed to keep at a fixed point
+u_bar = [0; 6*9.81-0.1];
+u_data  = u_data - u_bar; % Adjust for unmeasured input
 
 % Testing data - Last 50 s is for testing and one sample overlaps training 
 N_test = 5000; % Num of data samples for testing
@@ -60,7 +32,9 @@ Ts = t(2)-t(1);     % Sample time of data
 N  = length(t);     % Number of data samples
 
 % Add noise
-sigma = 0; % Noise standard deviation
+rng('default');
+rng(1); % Repeatable random numbers
+sigma = 0.01; % Noise standard deviation
 y_data_noise = y_data + sigma*randn(size(y_data));
 
 % Training data - Last sample of training is first sample of testing
@@ -69,10 +43,9 @@ y_train = y_data_noise(:,end-N_test-N_train+2:end-N_test+1); % Use noisy data
 u_train = u_data(:,end-N_test-N_train+2:end-N_test+1);
 t_train = t(:,end-N_test-N_train+2:end-N_test+1);
 
-%%
 % Parameters
-q = 200;
-p = 200;
+q = 400;
+p = 500;
 w = N_train - q + 1; % num columns of Hankel matrix
 D = (q-1)*Ts; % Delay duration (Dynamics in delay embedding)
 
@@ -87,9 +60,9 @@ YU_bar = [Y; Upsilon];
 
 % SVD of the Hankel matrix
 [U1,S1,V1] = svd(YU_bar, 'econ');
-% figure, semilogy(diag(S1), 'x'), hold on;
-% title('Singular values of Omega, showing p truncation')
-% plot(p,S1(p,p), 'ro'), hold off;
+figure, semilogy(diag(S1), 'x'), hold on;
+title('Singular values of Omega, showing p truncation')
+plot(p,S1(p,p), 'ro'), hold off;
 
 % Truncate SVD matrixes
 U_tilde = U1(:, 1:p); 
@@ -106,13 +79,13 @@ AB_tilde = V_til_2*pinv(V_til_1); % combined A and B matrix, side by side
 % convert to x coordinates
 AB_bar = (U_tilde*S_tilde)*AB_tilde*pinv(U_tilde*S_tilde);
 A_bar = AB_bar(1:q*m, 1:q*m);
-B_bar = AB_bar(1:q*m, q*m+l:end);
+B_bar = AB_bar(1:q*m, q*m+1:end);
 
 % DMD of Y
 Y2 = Y(:, 2:end  );
 Y1 = Y(:, 1:end-1);
 
-YU = [Y1; Upsilon(1:end-1)]; % Combined matrix of V and U, above and below
+YU = [Y1; Upsilon(:,1:end-1)]; % Combined matrix of Y and U, above and below
 AB = Y2*pinv(YU); % combined A and B matrix, side by side
 A  = AB(:,1:q*m); % Extract A matrix
 B  = AB(:,(q*m+1):end);
@@ -171,7 +144,8 @@ plot(t_train, y_train);
 hold on;
 plot(t_test, y_test);
 
-plot(t_test, y_hat_bar, '--', 'LineWidth', 1); % Plot only non-delay coordinate
+plot(t_test, y_hat, 'k--', 'LineWidth', 1); % Plot only non-delay coordinate
+plot(t_test, y_hat_bar, 'r--', 'LineWidth', 1); % Plot only non-delay coordinate
 plot((D + t(N-N_test-N_train)).*[1,1], ylim, 'r');
 plot(t(N-N_test-N_train).*[1,1], ylim, 'k');
 plot(t(N-N_test).*[1,1], ylim, 'k');
