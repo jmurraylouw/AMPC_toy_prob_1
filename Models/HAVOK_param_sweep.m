@@ -2,12 +2,12 @@
 close all;
 
 % Search space
-q_min = 30; % Min value of q in grid search
-q_max = 30; % Max value of q in grid search
+q_min = 151; % Min value of q in grid search
+q_max = 160; % Max value of q in grid search
 q_increment = 1; % Increment value of q in grid search
 
-p_min = 17; % Min value of p in grid search
-p_max = 25; % Max value of p in grid search
+p_min = 151; % Min value of p in grid search
+p_max = 155; % Max value of p in grid search
 p_increment = 1; % Increment value of p in grid search
 
 q_search = q_min:q_increment:q_max; % List of q parameters to search in
@@ -55,7 +55,7 @@ u_train = u_data(:,end-N_test-N_train+2:end-N_test+1);
 t_train = t(:,end-N_test-N_train+2:end-N_test+1);
     
 % Create empty results table
-VariableTypes = {'int8','int8','double'}; % id, q, p, MAE
+VariableTypes = {'int16','int16','double'}; % id, q, p, MAE
 VariableNames = {'q', 'p', 'MAE_mean'};
 for i = 1:m % Mae column for each measured state
     VariableNames = [VariableNames, strcat('MAE_', num2str(i))];
@@ -69,7 +69,7 @@ results_file = ['Data/havok_results_', simulation_data_file, '_sig=', sig_str, '
 
 try
     load(results_file);
-    results = rmmissing(results); % remove empty rows
+    results(~results.q,:) = []; % remove empty rows
     results = [results; table('Size',Size,'VariableTypes',VariableTypes,'VariableNames',VariableNames)];
     
 catch
@@ -79,10 +79,13 @@ catch
     emptry_row = 1; % Keep track of next empty row to insert results 
 end
 
+tic;
+
 % Grid search
 for q = q_search
         q_is_new = 1; % 1 = first time using this q this session
-
+        q
+        
         p_max_new = min([p_max, q*m]); % Max p to avoid out of bounds 
         p_search = p_min:p_increment:p_max_new; % List of p to search, for every q
         for p = p_search
@@ -123,13 +126,13 @@ for q = q_search
 
             % DMD on V
             AB_tilde = V_til_2*pinv(V_til_1); % combined A and B matrix, side by side
-
+            tic;
+            AB_tilde = stabilise(AB_tilde,3);
+            toc
             % convert to x coordinates
             AB_bar = (U_tilde*S_tilde)*AB_tilde*pinv(U_tilde*S_tilde);
             A_bar = AB_bar(1:q*m, 1:q*m);
-            B_bar = AB_bar(1:q*m, q*m+1:end);
-
-            A_bar = stabilise(A_bar,10);
+            B_bar = AB_bar(1:q*m, q*m+1:end);            
 
             % Compare to testing data
             % Initial condition (last entries of training data)
@@ -155,10 +158,15 @@ for q = q_search
             emptry_row = emptry_row + 1; 
             
         end % p
+        
+        save(results_file, 'results', 'emptry_row')
+
 end % q
 
+toc;
+
 % Save results
-results = rmmissing(results); % remove empty rows
+results(~results.q,:) = []; % remove empty rows
 save(results_file, 'results', 'emptry_row')
 
 best_row = find(results.MAE_mean == min(results.MAE_mean));
@@ -169,19 +177,15 @@ function A = stabilise(A_unstable,max_iterations)
     % Scale them to be stable
     A = A_unstable;
     count = 0;
-    while (sum(abs(eig(A)) > 1) ~= 0) 
-        count = count+1;
+    while (sum(abs(eig(A)) > 1) ~= 0)       
         [Ve,De] = eig(A);
         unstable = abs(De)>1; % indexes of unstable eigenvalues
-        De(unstable) = De(unstable)./abs(De(unstable)) - 10^(-16+count); % Normalize all unstable eigenvalues (set abs(eig) = 1)
+        De(unstable) = De(unstable)./abs(De(unstable)) - 10^(-14 + count*2); % Normalize all unstable eigenvalues (set abs(eig) = 1)
         A = Ve*De/(Ve); % New A with margininally stable eigenvalues
         A = real(A);
-        if(count>10)
+        count = count+1;
+        if(count > max_iterations)
             break
         end
-    end
-
-    if (sum(abs(eig(A)) > 1) ~= 0) % If eigenvalues are still unstable
-        error('Eigenvalues are unstable'); % Exit this p loop if still unstable
     end
 end

@@ -18,7 +18,7 @@ u_bar = mean(u_data,2); % Input needed to keep at a fixed point
 u_data  = u_data - u_bar; % Adjust for unmeasured input
 
 % Testing data - Last 50 s is for testing and one sample overlaps training 
-N_test = 3000; % Num of data samples for testing
+N_test = 2000; % Num of data samples for testing
 x_test = x_data(:,end-N_test+1:end);
 y_test = y_data(:,end-N_test+1:end); % One sample of testing data overlaps for initial condition
 u_test = u_data(:,end-N_test+1:end);
@@ -44,8 +44,8 @@ u_train = u_data(:,end-N_test-N_train+2:end-N_test+1);
 t_train = t(:,end-N_test-N_train+2:end-N_test+1);
 
 % Parameters
-q = 50;
-p = 25;
+q = 160;
+p = 151;
 w = N_train - q + 1; % num columns of Hankel matrix
 D = (q-1)*Ts; % Delay duration (Dynamics in delay embedding)
 
@@ -75,13 +75,13 @@ V_til_1 = V_tilde(1:end-1, :)';
 
 % DMD on V
 AB_tilde = V_til_2*pinv(V_til_1); % combined A and B matrix, side by side
+AB_tilde = stabilise(AB_tilde,3);
 
 % convert to x coordinates
 AB_bar = (U_tilde*S_tilde)*AB_tilde*pinv(U_tilde*S_tilde);
 A_bar = AB_bar(1:q*m, 1:q*m);
 B_bar = AB_bar(1:q*m, q*m+1:end);
-
-A_bar = stabilise(A_bar,10);
+% A_bar = stabilise(A_bar,3);
 
 % DMD of Y
 Y2 = Y(:, 2:end  );
@@ -161,14 +161,14 @@ function A = stabilise(A_unstable,max_iterations)
     % Scale them to be stable
     A = A_unstable;
     count = 0;
-    while (sum(abs(eig(A)) > 1) ~= 0) 
-        count = count+1;
+    while (sum(abs(eig(A)) > 1) ~= 0)       
         [Ve,De] = eig(A);
         unstable = abs(De)>1; % indexes of unstable eigenvalues
-        De(unstable) = De(unstable)./abs(De(unstable)) - 10^(-16+count); % Normalize all unstable eigenvalues (set abs(eig) = 1)
+        De(unstable) = De(unstable)./abs(De(unstable)) - 10^(-16 + count*2); % Normalize all unstable eigenvalues (set abs(eig) = 1)
         A = Ve*De/(Ve); % New A with margininally stable eigenvalues
         A = real(A);
-        if(count>10)
+        count = count+1;
+        if(count>max_iterations)
             break
         end
     end
@@ -176,20 +176,5 @@ function A = stabilise(A_unstable,max_iterations)
     if (sum(abs(eig(A)) > 1) ~= 0) % If eigenvalues are still unstable
         error('Eigenvalues are unstable'); % Exit this p loop if still unstable
     end
-end
-
-function dx = nl_msd(x,u)
-    % Non-linear mass spring damper
-    dx = zeros(2,1);
-
-    % Parameters
-    m = 1;
-    k = 1.1;
-    k_nl = 0.8;
-    c = 0.05;
-    
-    % State space ODE
-    dx(1,1) = 1/m*(x(2));
-    dx(2,1) = 1/m*(-c*x(2) - k*x(1) - k_nl*abs(x(1)) + u);
 end
 
