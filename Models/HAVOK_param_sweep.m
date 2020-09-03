@@ -55,8 +55,8 @@ u_train = u_data(:,end-N_test-N_train+2:end-N_test+1);
 t_train = t(:,end-N_test-N_train+2:end-N_test+1);
     
 % Create empty results table
-VariableTypes = {'string','int8','int8','double'}; % id, q, p, MAE
-VariableNames = {'id', 'q', 'p', 'MAE_mean'};
+VariableTypes = {'int8','int8','double'}; % id, q, p, MAE
+VariableNames = {'q', 'p', 'MAE_mean'};
 for i = 1:m % Mae column for each measured state
     VariableNames = [VariableNames, strcat('MAE_', num2str(i))];
     VariableTypes = [VariableTypes, 'double'];
@@ -151,8 +151,7 @@ for q = q_search
             MAE = sum(abs(y_hat - y_test), 2)./N_test; % For each measured state
         
             % Save results
-            id = strcat( sprintf('%04d',q), "_", sprintf('%04d',p)); % create unique id for this hyper-param combo
-            results(emptry_row,:) = [{id, q, p, mean(MAE)}, num2cell(MAE')]; % add to table of results
+            results(emptry_row,:) = [{q, p, mean(MAE)}, num2cell(MAE')]; % add to table of results
             emptry_row = emptry_row + 1; 
             
         end % p
