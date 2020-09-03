@@ -18,7 +18,7 @@ u_bar = [0; 6*9.81-0.1];
 u_data  = u_data - u_bar; % Adjust for unmeasured input
 
 % Testing data - Last 50 s is for testing and one sample overlaps training 
-N_test = 5000; % Num of data samples for testing
+N_test = 3000; % Num of data samples for testing
 x_test = x_data(:,end-N_test+1:end);
 y_test = y_data(:,end-N_test+1:end); % One sample of testing data overlaps for initial condition
 u_test = u_data(:,end-N_test+1:end);
@@ -38,14 +38,14 @@ sigma = 0.01; % Noise standard deviation
 y_data_noise = y_data + sigma*randn(size(y_data));
 
 % Training data - Last sample of training is first sample of testing
-N_train = 4000; % Number of sampels in training data
+N_train = 3000; % Number of sampels in training data
 y_train = y_data_noise(:,end-N_test-N_train+2:end-N_test+1); % Use noisy data
 u_train = u_data(:,end-N_test-N_train+2:end-N_test+1);
 t_train = t(:,end-N_test-N_train+2:end-N_test+1);
 
 % Parameters
 q = 400;
-p = 500;
+p = 1000;
 w = N_train - q + 1; % num columns of Hankel matrix
 D = (q-1)*Ts; % Delay duration (Dynamics in delay embedding)
 
@@ -115,7 +115,7 @@ y_hat_bar = Y_hat(end-m+1:end, :); % Extract only non-delay time series (last m 
 MAE_bar = sum(abs(y_hat_bar - y_test), 2)./N_test % For each measured state
 
 
-% Run with A and x
+%% Run with A and x
 
 % Initial condition
 y_hat_0 = zeros(q*m,1);
