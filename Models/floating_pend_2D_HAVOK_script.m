@@ -68,13 +68,12 @@ try
         q = q_saved(save_index)
         r = r_saved(save_index)
        
-%         Override
-%         disp('Override')
-%         disp('------------------')
-% 
-%         q = 62
-%         p = 50
-%         r = 48
+        disp('Override')
+        disp('------------------')
+
+        q = 80
+        p = 160
+        r = p-l
 
     else
         N_train
@@ -195,8 +194,14 @@ end
 A = U_hat*A_tilde*U_hat';
 B = U_hat*B_tilde;
 
+% DMDc
+XU = [X; Upsilon]; % Combined matrix of V and U, above and below
+AB = X2*pinv(XU); % combined A and B matrix, side by side
+A  = AB(:,1:q*m); % Extract A matrix
+B  = AB(:,(q*m+1):end);
+
 if (sum(abs(eig(A)) > 1) ~= 0) % If eigenvalues are unstable
-    error('eigenvalues are unstable');
+%     error('eigenvalues are unstable');
 end
 
 % Time taken to train this model
@@ -245,32 +250,32 @@ disp('Run model on training data')
 
 %% Compare to model from linearised dynamics
 
-disp('Compare to model from linearised dynamics')
-
-% Get linearised model from other script.
-% Change operating conditions and parameters in script
-[A_lin, B_lin] = linearise_floating_pend_2D();
-
-% Initial condition
-x_hat_2 = zeros(size(x_test)); % Empty estimated y from pre-determined linearised model
-x_hat_2(:,1) = x_test(:,1); % Initial condition
-
-%% ???? Fix u used to be real u, not adjusted by u_bar
-
-% Run model
-% Solve for small intervals with constant u
-for i=1:N_test-1
-    x0 = x_hat_2(:,i); % initial condition for this time step
-    u = u_test(:,i); % Assume constant u at average of time interval
-    [t_1,x_1] = ode45(@(t_1,x_1) (A_lin*x_1 + B_lin*u), t_test(i:i+1), x0);
-    x_hat_2(:,i+1) = x_1(end,:);
-end
-
-% Extract only measured states
-y_hat_2 = x_hat_2(1:m, :);
-
-% Vector of Mean Absolute Error on testing data
-MAE_lin = sum(abs(y_hat_2 - y_test), 2)./N_test % For each measured state
+% disp('Compare to model from linearised dynamics')
+% 
+% % Get linearised model from other script.
+% % Change operating conditions and parameters in script
+% [A_lin, B_lin] = linearise_floating_pend_2D();
+% 
+% % Initial condition
+% x_hat_2 = zeros(size(x_test)); % Empty estimated y from pre-determined linearised model
+% x_hat_2(:,1) = x_test(:,1); % Initial condition
+% 
+% %% ???? Fix u used to be real u, not adjusted by u_bar
+% 
+% % Run model
+% % Solve for small intervals with constant u
+% for i=1:N_test-1
+%     x0 = x_hat_2(:,i); % initial condition for this time step
+%     u = u_test(:,i); % Assume constant u at average of time interval
+%     [t_1,x_1] = ode45(@(t_1,x_1) (A_lin*x_1 + B_lin*u), t_test(i:i+1), x0);
+%     x_hat_2(:,i+1) = x_1(end,:);
+% end
+% 
+% % Extract only measured states
+% y_hat_2 = x_hat_2(1:m, :);
+% 
+% % Vector of Mean Absolute Error on testing data
+% MAE_lin = sum(abs(y_hat_2 - y_test), 2)./N_test % For each measured state
 
 %% Plot data vs model
 figure;

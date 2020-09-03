@@ -15,7 +15,7 @@ f = @nl_msd; % Model for this simulation
 % Input data
 u_data = zeros(1, length(t));
 rand_u = 0;
-rand_interval = 10; % Size of
+rand_interval = 5; % Size of
 sigma_u = 1;
 
 for i = 1:length(t)
@@ -71,7 +71,7 @@ t_train = t(:,end-N_test-N_train+2:end-N_test+1);
 
 %%
 % Parameters
-q = 400;
+q = 200;
 p = 200;
 w = N_train - q + 1; % num columns of Hankel matrix
 D = (q-1)*Ts; % Delay duration (Dynamics in delay embedding)
@@ -82,8 +82,11 @@ for row = 0:q-1 % Add delay coordinates
     Y(row*m+1:(row+1)*m, :) = y_train(:, row + (0:w-1) + 1);
 end
 
+Upsilon = u_train(:, q:end); % Leave out last time step to match V_til_1
+YU_bar = [Y; Upsilon];
+
 % SVD of the Hankel matrix
-[U1,S1,V1] = svd(Y, 'econ');
+[U1,S1,V1] = svd(YU_bar, 'econ');
 % figure, semilogy(diag(S1), 'x'), hold on;
 % title('Singular values of Omega, showing p truncation')
 % plot(p,S1(p,p), 'ro'), hold off;
@@ -98,49 +101,48 @@ V_til_2 = V_tilde(2:end  , :)'; % Turnd on side (wide short matrix)
 V_til_1 = V_tilde(1:end-1, :)';
 
 % DMD on V
-% Based on DMD control example video by Steve Brunton
-U = u_train(:, q:end-1); % Leave out last time step to match V_til_1
-VU = [V_til_1; U]; % Combined matrix of V and U, above and below
-AB = V_til_2*pinv(VU); % combined A and B matrix, side by side
-A_tilde  = AB(:,1:p); % Extract A matrix
-B_tilde  = AB(:,(p+1):end);
+AB_tilde = V_til_2*pinv(V_til_1); % combined A and B matrix, side by side
 
 % convert to x coordinates
-% A = (U_tilde*S_tilde)*A_tilde*pinv(U_tilde*S_tilde);
+AB_bar = (U_tilde*S_tilde)*AB_tilde*pinv(U_tilde*S_tilde);
+A_bar = AB_bar(1:q*m, 1:q*m);
+B_bar = AB_bar(1:q*m, q*m+l:end);
 
 % DMD of Y
 Y2 = Y(:, 2:end  );
 Y1 = Y(:, 1:end-1);
 
-YU = [Y1; U]; % Combined matrix of V and U, above and below
+YU = [Y1; Upsilon(1:end-1)]; % Combined matrix of V and U, above and below
 AB = Y2*pinv(YU); % combined A and B matrix, side by side
 A  = AB(:,1:q*m); % Extract A matrix
 B  = AB(:,(q*m+1):end);
 
-%% Compare to testing data
+% Compare to testing data
 
-%% Run with A_tilde and v
+%Run with A_bar, B_bar and x
 figure;
 plot(V1(:,1:5))
 
-% Initial condition
-v_hat_0 = V_tilde(end,:)';
-
-% Run model
-V_hat = zeros(length(v_hat_0),N_test); % Empty estimated Y
-V_hat(:,1) = v_hat_0; % Initial condition
-for k = 1:N_test-1
-    V_hat(:,k+1) = A_tilde*V_hat(:,k) + B_tilde*u_test(:,k);
+% Initial condition (last entries of training data)
+y_hat_0 = zeros(q*m,1);
+for row = 0:q-1 % First column of spaced Hankel matrix
+    y_hat_0(row*m+1:(row+1)*m, 1) = y_train(:, end - ((q-1)+1) + row + 1);
 end
 
-Y_hat2 = (U_tilde*S_tilde)*V_hat; % Convert to Y
-y_hat2 = Y_hat2(end-m+1:end, :); % Extract only non-delay time series (last m rows)
+% Run model
+Y_hat = zeros(length(y_hat_0),N_test); % Empty estimated Y
+Y_hat(:,1) = y_hat_0; % Initial condition
+for k = 1:N_test-1
+    Y_hat(:,k+1) = A_bar*Y_hat(:,k) + B_bar*u_test(:,k);
+end
+
+y_hat_bar = Y_hat(end-m+1:end, :); % Extract only non-delay time series (last m rows)
 
 % Vector of Mean Absolute Error on testing data
-MAE_til = sum(abs(y_hat2 - y_test), 2)./N_test % For each measured state
+MAE_bar = sum(abs(y_hat_bar - y_test), 2)./N_test % For each measured state
 
 
-%% Run with A and x
+% Run with A and x
 
 % Initial condition
 y_hat_0 = zeros(q*m,1);
@@ -160,16 +162,16 @@ y_hat = Y_hat(end-m+1:end, :); % Extract only non-delay time series (last m rows
 % Vector of Mean Absolute Error on testing data
 MAE = sum(abs(y_hat - y_test), 2)./N_test % For each measured state
 
-%% Compare MAE and MAE_til
-MAE_error_percent = (MAE - MAE_til)./MAE_til*100
+% Compare MAE and MAE_til
+MAE_error_percent = (MAE - MAE_bar)./MAE_bar*100
 
-%% Plot data vs model
+% Plot data vs model
 figure;
 plot(t_train, y_train);
 hold on;
 plot(t_test, y_test);
 
-plot(t_test, y_hat2, '--', 'LineWidth', 1); % Plot only non-delay coordinate
+plot(t_test, y_hat_bar, '--', 'LineWidth', 1); % Plot only non-delay coordinate
 plot((D + t(N-N_test-N_train)).*[1,1], ylim, 'r');
 plot(t(N-N_test-N_train).*[1,1], ylim, 'k');
 plot(t(N-N_test).*[1,1], ylim, 'k');
