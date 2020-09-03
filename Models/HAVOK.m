@@ -34,8 +34,7 @@ N  = length(t);     % Number of data samples
 % Add noise
 rng('default');
 rng(1); % Repeatable random numbers
-sigma = 0.01
-; % Noise standard deviation
+sigma = 0.01; % Noise standard deviation
 y_data_noise = y_data + sigma*randn(size(y_data));
 
 % Training data - Last sample of training is first sample of testing
@@ -45,8 +44,8 @@ u_train = u_data(:,end-N_test-N_train+2:end-N_test+1);
 t_train = t(:,end-N_test-N_train+2:end-N_test+1);
 
 % Parameters
-q = 60;
-p = 30;
+q = 50;
+p = 25;
 w = N_train - q + 1; % num columns of Hankel matrix
 D = (q-1)*Ts; % Delay duration (Dynamics in delay embedding)
 
@@ -83,7 +82,6 @@ A_bar = AB_bar(1:q*m, 1:q*m);
 B_bar = AB_bar(1:q*m, q*m+1:end);
 
 A_bar = stabilise(A_bar,10);
-
 
 % DMD of Y
 Y2 = Y(:, 2:end  );
