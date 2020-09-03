@@ -1,35 +1,22 @@
 % Implentation of Hankel Alternative View Of Koopman
 close all;
 
-% load('cartpend_random_1.mat') % Load simulation data
-% load('Data/cartpend_disturbance_and_PID_1.mat') % Load simulation data
-simulation_data_file = 'floating_pend_2D_data_3';
-load(['Data/', simulation_data_file, '.mat']) % Load simulation data
-
 % Search space
-q_min = 20; % Min value of q in grid search
+q_min = 30; % Min value of q in grid search
 q_max = 30; % Max value of q in grid search
 q_increment = 1; % Increment value of q in grid search
 
-p_min = 20; % Min value of p in grid search
-p_max = 30; % Max value of p in grid search
+p_min = 17; % Min value of p in grid search
+p_max = 25; % Max value of p in grid search
 p_increment = 1; % Increment value of p in grid search
 
 q_search = q_min:q_increment:q_max; % List of q parameters to search in
 % p_search defined before p for loop
 
-% Results table (pre-allocate)
-VariableTypes = {'string','int8','int8','double'}; % id, q, p, MAE
-VariableNames = {'id', 'q', 'p', 'MAE_mean'};
-for i = 1:m % Mae column for each measured state
-    VariableNames = [VariableNames, strcat('MAE_', num2str(i))];
-    VariableTypes = [VariableTypes, 'double'];
-end
-Size = [length(q_search)*length(p_min:p_increment:p_max), length(VariableTypes)];
-results = table('Size',Size,'VariableTypes',VariableTypes,'VariableNames',VariableNames);
-emptry_row = 1; % Keep track of next empty row to insert results
-
 % Extract data
+simulation_data_file = 'floating_pend_2D_data_3';
+load(['Data/', simulation_data_file, '.mat']) % Load simulation data
+
 u_data  = out.u.Data';
 x_data  = out.x.Data';
 measured_states = [1,2,3];
@@ -66,6 +53,31 @@ N_train = 4000; % Number of sampels in training data
 y_train = y_data_noise(:,end-N_test-N_train+2:end-N_test+1); % Use noisy data
 u_train = u_data(:,end-N_test-N_train+2:end-N_test+1);
 t_train = t(:,end-N_test-N_train+2:end-N_test+1);
+    
+% Create empty results table
+VariableTypes = {'string','int8','int8','double'}; % id, q, p, MAE
+VariableNames = {'id', 'q', 'p', 'MAE_mean'};
+for i = 1:m % Mae column for each measured state
+    VariableNames = [VariableNames, strcat('MAE_', num2str(i))];
+    VariableTypes = [VariableTypes, 'double'];
+end
+Size = [length(q_search)*length(p_min:p_increment:p_max), length(VariableTypes)];
+
+% Read results
+sig_str = strrep(num2str(sigma),'.','_'); % Convert sigma value to string
+results_file = ['Data/havok_results_', simulation_data_file, '_sig=', sig_str, '.mat'];
+
+try
+    load(results_file);
+    results = rmmissing(results); % remove empty rows
+    results = [results; table('Size',Size,'VariableTypes',VariableTypes,'VariableNames',VariableNames)];
+    
+catch
+    disp('No saved results file')  
+    
+    results = table('Size',Size,'VariableTypes',VariableTypes,'VariableNames',VariableNames);
+    emptry_row = 1; % Keep track of next empty row to insert results 
+end
 
 % Grid search
 for q = q_search
@@ -75,6 +87,10 @@ for q = q_search
         p_search = p_min:p_increment:p_max_new; % List of p to search, for every q
         for p = p_search
             p_is_new = 1; % 1 = first time using this p this session
+            
+            if ~isempty(find(results.q == q & results.p == p, 1)) 
+                continue % continue to next p if this combo has been searched before
+            end
             
             if q_is_new % Do this only when q is seen first time
                 q_is_new = 0; % q is no longer new
@@ -141,6 +157,10 @@ for q = q_search
             
         end % p
 end % q
+
+% Save results
+results = rmmissing(results); % remove empty rows
+save(results_file, 'results', 'emptry_row')
 
 best_row = find(results.MAE_mean == min(results.MAE_mean));
 best_results = results(best_row,:)
