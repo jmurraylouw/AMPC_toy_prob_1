@@ -1,7 +1,8 @@
 syms m M l g d u
-syms x(t) theta(t) xdot thetadot
+syms x(t) theta(t)
 y = sym('y', [4 1]);
 
+% Rates
 dx        = diff(x, t);
 dtheta    = diff(theta, t);
 
@@ -20,27 +21,23 @@ PE_m = m*g*z_m;
 L = (KE_M + KE_m) - (PE_M + PE_m);
 L = simplify(L);
 
-% Equation from Lagraungian, with regards to x
-eq_x        = euler_lag(L, x,       u-d*dx,  t); % eq_x == 0
-eq_theta    = euler_lag(L, theta,   0, t);
+% Non-conservative Forces
+Qx     = u-d*dx;
+Qtheta = 0;
 
-% Substitute symbols into derivatives
+% Equation from Lagraungian, with regards to x
+eq_x     = euler_lag(L, x,       Qx,  t); % eq_x == 0
+eq_theta = euler_lag(L, theta,   Qtheta, t);
+
 % Clear symbol connections
 syms dx dtheta
 syms ddx ddtheta
 
-old = [diff(x,t,t), diff(theta,t,t)];
-new = [ddx,    ddtheta];
+% Substitute symbols into derivatives
+old = [diff(x,t), diff(theta,t), diff(x,t,t), diff(theta,t,t)];
+new = [dx,        dtheta,        ddx,         ddtheta];
 eq_x = subs(eq_x, old, new);
 eq_theta = subs(eq_theta, old, new);
-
-old = [diff(x,t), diff(theta,t)];
-new = [dx,    dtheta];
-eq_x = subs(eq_x, old, new);
-eq_theta = subs(eq_theta, old, new);
-
-eq_x = isolate(eq_x==0, ddx);
-eq_theta = isolate(eq_theta==0, ddtheta);
 
 % Solve
 eqns = [eq_x, eq_theta];

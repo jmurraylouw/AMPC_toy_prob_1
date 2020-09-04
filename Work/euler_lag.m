@@ -24,5 +24,5 @@ dL_dq = subs(dL_dq, qdot_, diff(q,t));
 dL_dq = subs(dL_dq, q_, q);
 
 % Lagrangian equation
-eq = ( diff(dL_dqdot, t) - dL_dq - Q );     % Set as eq == 0
+eq = ( diff(dL_dqdot, t) - dL_dq == Q ); 
 
