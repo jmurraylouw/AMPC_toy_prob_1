@@ -1,5 +1,6 @@
 %% Derive system equations for 2D drone with suspended payload
 % Two vertical forces at distance, r, from COM represent the rotor forces
+clear all
 
 % Define symbolic variables
 syms M % Mass of drone body (at fulcrum)
@@ -66,6 +67,36 @@ eq_beta  = euler_lag(L, beta,  Qbeta, t);
 % Clear symbol connections
 syms dx  dz  dtheta  dbeta
 syms ddx ddz ddtheta ddtheta
+dstates  = [dx;  dz;  dtheta;  dbeta];
+ddstates = [ddx;  ddz;  ddtheta;  ddbeta];
+
+eqns = [eq_x; eq_z; eq_theta; eq_beta]; % VEquations to solve with
+
+% Substitute symbols into derivatives
+old = [diff(states,t); diff(states,t,t)];
+new = [dstates;        ddstates];
+eqns = subs(eqns, old, new);
+
+% Solve
+solution = solve(eqns, ddstates);
+ddstates = [ddx;  ddz;  ddtheta;  ddbeta];
+
+% Simplify
+ddx     = simplifyFraction(solution.ddx);
+ddz     = simplifyFraction(solution.ddz);
+ddtheta = simplifyFraction(solution.ddtheta);
+ddbeta  = simplifyFraction(solution.ddbeta);
+
+
+
+% Substitute state variables with y
+old = [states; dstates];
+new = X;
+ddx = subs(ddx, old, new);
+ddtheta = subs(ddtheta, old, new);
+
+pretty(ddx)
+pretty(ddtheta)
 
 %% Display to copy
 ddx
