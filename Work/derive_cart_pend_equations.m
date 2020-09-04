@@ -21,11 +21,11 @@ PE_m = m*g*z_m;
 L = (KE_M + KE_m) - (PE_M + PE_m);
 L = simplify(L);
 
-% Non-conservative Forces
+% Non-conservative Forces and Torques
 Qx     = u-d*dx;
 Qtheta = 0;
 
-% Equation from Lagraungian, with regards to x
+% Lagraungian equations
 eq_x     = euler_lag(L, x,       Qx,  t); % eq_x == 0
 eq_theta = euler_lag(L, theta,   Qtheta, t);
 
@@ -33,15 +33,15 @@ eq_theta = euler_lag(L, theta,   Qtheta, t);
 syms dx dtheta
 syms ddx ddtheta
 
+vars = [ddx; ddtheta]; % Variables to solve for
+eqns = [eq_x; eq_theta]; % VEquations to solve with
+
 % Substitute symbols into derivatives
 old = [diff(x,t), diff(theta,t), diff(x,t,t), diff(theta,t,t)];
 new = [dx,        dtheta,        ddx,         ddtheta];
-eq_x = subs(eq_x, old, new);
-eq_theta = subs(eq_theta, old, new);
+eqns = subs(eqns, old, new);
 
 % Solve
-eqns = [eq_x, eq_theta];
-vars = [ddx, ddtheta];
 solution = solve(eqns, vars);
 
 % Simplify

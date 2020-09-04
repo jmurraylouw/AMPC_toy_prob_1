@@ -57,76 +57,30 @@ Qz = (F1 + F2)*cos(theta) - cz*dz;
 Qtheta = F2*r - F1*r - ctheta*dtheta; % Torques caused be rotor forces and air damping
 Qbeta  = -cbeta*dbeta; % Torques caused air damping on rotation of cable
 
-% Lagrangian equations (eq_x == 0)
+% Lagrangian equations
 eq_x     = euler_lag(L, x, Qx, t); 
 eq_z     = euler_lag(L, z, Qz, t);
 eq_theta = euler_lag(L, theta, Qtheta, t);
-eq_beta  = euler_lag(L, beta, Qbeta, t);
+eq_beta  = euler_lag(L, beta,  Qbeta, t);
 
-% Isolate x"
-ddx     = rhs(isolate(eq_x==0, diff(x,t,t))); % Still depends on z", beta"
-
-% Substitute x"
-eq_z        = subs(eq_z, diff(x,t,t), ddx);  % Contains z", beta"
-eq_beta    = subs(eq_beta, diff(x,t,t), ddx);  % Contains z", beta"
-
-% Isolate z"
-zdotdot     = rhs(isolate(eq_z==0, diff(z,t,t))); % Still depends on beta"
-
-% Substitute z"
-eq_x        = subs(eq_x, diff(z,t,t), zdotdot);  % Contains x", beta"
-eq_beta    = subs(eq_beta, diff(z,t,t), zdotdot);  % Contains only beta"
-
-% Isolate beta"
-betadotdot     = rhs(isolate(eq_beta==0, diff(beta,t,t))); % No more dotdot dependencies
-
-% Substitute beta"
-eq_x    = subs(eq_x, diff(beta,t,t), betadotdot);  % Contains only x"
-eq_z    = subs(eq_z, diff(beta,t,t), betadotdot);  % Contains only z"
-
-% Isolate x" and z"
-ddx     = rhs(isolate(eq_x==0, diff(x,t,t))); % No more dotdot dependencies
-zdotdot     = rhs(isolate(eq_z==0, diff(z,t,t))); % No more dotdot dependencies
-
-% Simplify
-ddx = simplifyFraction(ddx);
-zdotdot = simplifyFraction(zdotdot);
-betadotdot = simplifyFraction(betadotdot);
-
-% Substitute vecolcity state variables with y
-old = [diff(x,t),   diff(z,t),  diff(beta,t)];
-new = [X(4),        X(5),       X(6)];
-ddx     = subs(ddx, old, new);
-zdotdot     = subs(zdotdot, old, new);
-betadotdot = subs(betadotdot, old, new);
-
-% Substitute other state variables seperately to avoid losing derivatives
-old = [x,    z,    beta];
-new = [X(1), X(2), X(3)];  
-ddx     = subs(ddx, old, new);
-zdotdot     = subs(zdotdot, old, new);
-betadotdot = subs(betadotdot, old, new);
+% Clear symbol connections
+syms dx  dz  dtheta  dbeta
+syms ddx ddz ddtheta ddtheta
 
 %% Display to copy
 ddx
-zdotdot
-betadotdot
+ddz
+ddtheta
+ddbeta
 
 %% Display pretty equations
 'xdotdot'
 pretty(ddx)
 'zdotdot'
-pretty(zdotdot)
+pretty(ddz)
+'thetadotdot'
+pretty(ddtheta)
 'betadotdot'
-pretty(betadotdot)
-
-
-
-
-% dy(1,1) = y(2);
-% dy(2,1) = double(xdotdot);
-% dy(3,1) = y(4);
-% dy(4,1) = double(betadotdot);
-
+pretty(ddbeta)
 
 
