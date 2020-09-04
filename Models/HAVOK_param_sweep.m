@@ -1,13 +1,17 @@
 % Implentation of Hankel Alternative View Of Koopman
+% Grid search of parameters
+% Saves all the results for different parameter combinations
+
 close all;
+clear all;
 
 % Search space
-q_min = 151; % Min value of q in grid search
-q_max = 160; % Max value of q in grid search
+q_min = 30; % Min value of q in grid search
+q_max = 300; % Max value of q in grid search
 q_increment = 1; % Increment value of q in grid search
 
-p_min = 151; % Min value of p in grid search
-p_max = 155; % Max value of p in grid search
+p_min = 30; % Min value of p in grid search
+p_max = 500; % Max value of p in grid search
 p_increment = 1; % Increment value of p in grid search
 
 q_search = q_min:q_increment:q_max; % List of q parameters to search in
@@ -126,9 +130,8 @@ for q = q_search
 
             % DMD on V
             AB_tilde = V_til_2*pinv(V_til_1); % combined A and B matrix, side by side
-            tic;
             AB_tilde = stabilise(AB_tilde,3);
-            toc
+            
             % convert to x coordinates
             AB_bar = (U_tilde*S_tilde)*AB_tilde*pinv(U_tilde*S_tilde);
             A_bar = AB_bar(1:q*m, 1:q*m);
