@@ -1,6 +1,6 @@
 syms m M l g d u
 syms x(t) theta(t) xdot thetadot
-y = sym('y', [4 1])
+y = sym('y', [4 1]);
 
 dx        = diff(x, t);
 dtheta    = diff(theta, t);
@@ -23,9 +23,6 @@ L = simplify(L);
 % Equation from Lagraungian, with regards to x
 eq_x        = euler_lag(L, x,       u-d*dx,  t); % eq_x == 0
 eq_theta    = euler_lag(L, theta,   0, t);
-
-eq_x        = simplify(eq_x);
-eq_theta    = simplify(eq_theta);
 
 % Substitute symbols into derivatives
 % Clear symbol connections
@@ -50,9 +47,7 @@ eqns = [eq_x, eq_theta];
 vars = [ddx, ddtheta];
 solution = solve(eqns, vars);
 
-solution.ddx
-solution.ddtheta
-
+% Simplify
 ddx = simplifyFraction(solution.ddx);
 ddtheta = simplifyFraction(solution.ddtheta);
 
@@ -62,14 +57,8 @@ new = [y(1), y(2), y(3),  y(4)];
 ddx = subs(ddx, old, new);
 ddtheta = subs(ddtheta, old, new);
 
-ddx = simplifyFraction(solution.ddx);
-ddtheta = simplifyFraction(solution.ddtheta);
-
-ddtheta = simplifyFraction(subs(ddtheta, x, y(1)));
-ddtheta = simplifyFraction(subs(ddtheta, theta, y(3)));
-
-ddtheta
-ddx
+pretty(ddx)
+pretty(ddtheta)
 
 % dy(1,1) = y(2);
 % dy(2,1) = double(xdotdot);
