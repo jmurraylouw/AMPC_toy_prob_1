@@ -27,7 +27,9 @@ syms dz % dz/dt of drone
 syms dtheta % dtheta/dt of drone
 syms dbeta % dbeta/dt of payload cable
 
-X = sym('X', [8 1]); % State vector [x; z; theta; beta; dx; dz; dtheta; dbeta]
+n = 8; % number of states
+X = sym('X', [n, 1]); % State vector [x; z; theta; beta; dx; dz; dtheta; dbeta]
+states = [x; z; theta; beta]; % non-rate states
 
 % Rates
 dx        = diff(x, t);
@@ -66,7 +68,7 @@ eq_beta  = euler_lag(L, beta,  Qbeta, t);
 
 % Clear symbol connections
 syms dx  dz  dtheta  dbeta
-syms ddx ddz ddtheta ddtheta
+syms ddx ddz ddtheta ddbeta
 dstates  = [dx;  dz;  dtheta;  dbeta];
 ddstates = [ddx;  ddz;  ddtheta;  ddbeta];
 
@@ -79,25 +81,25 @@ eqns = subs(eqns, old, new);
 
 % Solve
 solution = solve(eqns, ddstates);
-ddstates = [ddx;  ddz;  ddtheta;  ddbeta];
+ddstates = struct2cell(solution); % Convert to cell from struct
+ddstates = [ddstates{:}]; % Convert to normal syms array from cell
 
 % Simplify
-ddx     = simplifyFraction(solution.ddx);
-ddz     = simplifyFraction(solution.ddz);
-ddtheta = simplifyFraction(solution.ddtheta);
-ddbeta  = simplifyFraction(solution.ddbeta);
-
-
+ddstates = simplifyFraction(ddstates);
 
 % Substitute state variables with y
 old = [states; dstates];
 new = X;
-ddx = subs(ddx, old, new);
-ddtheta = subs(ddtheta, old, new);
+ddstates = subs(ddstates, old, new);
 
-pretty(ddx)
-pretty(ddtheta)
+%%
+for i = 1:n/2
+    disp(i + n/2)
+    pretty(ddstates(i))
+    disp("-------------------------------")
+end
 
+stop
 %% Display to copy
 ddx
 ddz

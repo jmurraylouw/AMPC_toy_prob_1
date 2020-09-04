@@ -47,7 +47,7 @@ eqns = subs(eqns, old, new);
 
 % Solve
 solution = solve(eqns, ddstates);
-ddstates = struct2cell(solution);
+ddstates = struct2cell(solution); % Convert to cell from struct
 ddstates = [ddstates{:}]; % Convert to normal syms array from cell
 
 % Simplify
